@@ -41,7 +41,7 @@ public class Main {
         String default_file = "./infinity_test.txt";
         if(args.length > 1) default_file = args[1];
 
-        Graph = Util.buildGraph(default_file,"  ","",true,10e2);
+        Graph = Util.buildGraph(default_file,"  ","",true,0);
         //double d = Util.min_double;
         //Graph = new double[][]{{-5,-3,d,d},{d,-5,d,-2},{d,-3,-5,-2},{d,d,-6,-5}};
         size = Graph.length;

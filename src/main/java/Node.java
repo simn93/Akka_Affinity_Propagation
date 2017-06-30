@@ -76,7 +76,7 @@ public class Node extends AbstractActor{
         is_infinity = 0;
         a_received = 0;
         r_received = 0;
-        this.optimize = true;
+        this.optimize = false;
     }
 
     private void sendIdentifyRequest() {
@@ -107,7 +107,7 @@ public class Node extends AbstractActor{
 
                 //To begin the availabilities are initialized to 0
                 a_row = new double[size];
-                //In the first iteration is set to
+                //In the first iteration is set to s_col[i] - max{s_col[j]} j != i
                 r_col = new double[size];
 
                 //The IEEE 754 format has one bit reserved for the sign
@@ -117,16 +117,6 @@ public class Node extends AbstractActor{
                 // Thus the minimum value is simply the same as the maximum value,
                 // with the sign-bit changed, so yes,
                 // -Double.MAX_VALUE is the smallest possible actual number you can represent with a double.
-                for(int i = 0; i < size; i++) {
-                    // r initialize
-                    r_col[i] = s_col[i];
-                    double max = Util.min_double;
-                    for(int j = 0; j < size; j++) {
-                        if(j != i && max < s_col[j])
-                            max = s_col[j];
-                    }
-                    r_col[i] -= max;
-                }
 
                 if(optimize) {
                     int not_linked_neighbors = 0;
@@ -134,10 +124,16 @@ public class Node extends AbstractActor{
                         //Not the node which i cannot reach, but the node which cannot reach me
                         if (Util.isMinDouble(s_col[i])){
                             is_infinity++;
+
+                            // r initialize
+                            r_col[i] = Util.min_double;
                         }
                         //The node i cannot reach
                         if(Util.isMinDouble(s_row[i])){
                             not_linked_neighbors++;
+
+                            // a initialize
+                            // no need to do. is 0 to default
                         }
 
                     }
@@ -168,7 +164,7 @@ public class Node extends AbstractActor{
             })
 
             .match(Responsibility.class, responsibility -> {
-                //if(!Util.isMinDouble(responsibility.value))
+                //if(Util.isMinDouble(responsibility.value))System.out.println(responsibility.value);
                     r_col[responsibility.sender] =
                             (r_col[responsibility.sender] * lambda) + (responsibility.value * (1 - lambda));
                 r_received++;
