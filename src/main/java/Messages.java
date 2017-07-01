@@ -6,8 +6,7 @@ import java.io.Serializable;
  * Created by Simo on 05/06/2017.
  */
 
-public interface Messages extends Serializable {
-    //TODO: migliorare la serializzazione
+interface Messages extends Serializable {
 }
 
 class Responsibility implements Messages {
@@ -59,30 +58,20 @@ class Initialize implements Messages {
 class Value implements Messages {
     public Double value;
     public int sender;
+    public long iteration;
 
-    public Value(Double value, int sender){
+    public Value(Double value, int sender, long iteration){
         this.value = value;
         this.sender = sender;
+        this.iteration = iteration;
     }
 }
 
 class Self implements Messages {
-    public ActorRef self;
 
-    public Self(ActorRef self){
-        this.self = self;
-    }
 }
 
 class Die implements Messages{
-
-}
-
-class GetNeighbors implements Messages {
-
-}
-
-class AskExemplar implements Messages {
 
 }
 
@@ -91,8 +80,5 @@ class Start implements Messages {
 }
 
 class Ready implements Messages {
-    public int self;
 
-    public Ready(){}
-    public Ready(int self){this.self = self;}
 }

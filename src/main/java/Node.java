@@ -1,14 +1,12 @@
 import akka.actor.*;
 import scala.concurrent.duration.Duration;
-
 import java.util.Optional;
-
 import static java.util.concurrent.TimeUnit.SECONDS;
 
 /**
  * Created by Simo on 03/06/2017.
  */
-public class Node extends AbstractActor{
+class Node extends AbstractActor{
     // Connection variable
     private ActorRef dispatcher;
     private String path;
@@ -50,10 +48,6 @@ public class Node extends AbstractActor{
     private ActorRef[] not_infinite_neighbors;
     private int[] reference;
 
-    static public Props props(String path) {
-        return Props.create(Node.class, () -> new Node(path));
-    }
-
     public Node(String path){
         this.path = path;
         standardSetting();
@@ -65,18 +59,19 @@ public class Node extends AbstractActor{
         this.dispatcher = dispatcher;
         standardSetting();
 
-        dispatcher.tell(new Self(self()),self());
+        dispatcher.tell(new Self(),self());
         getContext().watch(dispatcher);
         getContext().become(active, true);
-        //System.out.println("Remote actor available: " + path);
     }
 
     private void standardSetting(){
         iteration = 0;
-        is_infinity = 0;
-        a_received = 0;
+
         r_received = 0;
-        this.optimize = false;
+        a_received = 0;
+
+        optimize = true;
+        is_infinity = 0;
     }
 
     private void sendIdentifyRequest() {
@@ -110,35 +105,19 @@ public class Node extends AbstractActor{
                 //In the first iteration is set to s_col[i] - max{s_col[j]} j != i
                 r_col = new double[size];
 
-                //The IEEE 754 format has one bit reserved for the sign
-                // and the remaining bits representing the magnitude.
-                // This means that it is "symmetrical" around origo
-                // (as opposed to the Integer values, which have one more negative value).
-                // Thus the minimum value is simply the same as the maximum value,
-                // with the sign-bit changed, so yes,
-                // -Double.MAX_VALUE is the smallest possible actual number you can represent with a double.
-
                 if(optimize) {
                     int not_linked_neighbors = 0;
                     for (int i = 0; i < size; i++) {
-                        //Not the node which i cannot reach, but the node which cannot reach me
-                        if (Util.isMinDouble(s_col[i])){
+                        if (Util.isMinDouble(s_col[i])){ //The node which cannot reach me
                             is_infinity++;
-
-                            // r initialize
-                            r_col[i] = Util.min_double;
+                            r_col[i] = Util.min_double; // r initialize
                         }
-                        //The node i cannot reach
-                        if(Util.isMinDouble(s_row[i])){
+
+                        if(Util.isMinDouble(s_row[i])){ //The node i cannot reach
                             not_linked_neighbors++;
-
-                            // a initialize
-                            // no need to do. is 0 to default
+                            // a initialize : no need to do. is 0 to default
                         }
-
                     }
-                    //System.out.println(is_infinity+" "+not_linked_neighbors);
-
                     this.not_infinite_neighbors = new ActorRef[size - not_linked_neighbors];
                     this.reference = new int[size - not_linked_neighbors];
 
@@ -159,14 +138,12 @@ public class Node extends AbstractActor{
 
             // Messaggio di start
             .match(Start.class, msg -> {
-                System.out.println(self + " started!");
+                //System.out.println(self + " started!");
                 sendResponsibility();
             })
 
             .match(Responsibility.class, responsibility -> {
-                //if(Util.isMinDouble(responsibility.value))System.out.println(responsibility.value);
-                    r_col[responsibility.sender] =
-                            (r_col[responsibility.sender] * lambda) + (responsibility.value * (1 - lambda));
+                r_col[responsibility.sender] = (r_col[responsibility.sender] * lambda) + (responsibility.value * (1 - lambda));
                 r_received++;
 
                 if (r_received == size - is_infinity) {
@@ -177,34 +154,25 @@ public class Node extends AbstractActor{
             })
 
             .match(Availability.class, availability -> {
-                //if(!Util.isMinDouble(availability.value))
-                    a_row[availability.sender] =
-                            (a_row[availability.sender] * lambda) + (availability.value * (1 - lambda));
+                a_row[availability.sender] = (a_row[availability.sender] * lambda) + (availability.value * (1 - lambda));
                 a_received++;
 
                 if (a_received == size) {
                     a_received = 0;
 
                     //Iteration's end
-                    if (this.iteration % 100 == 99) {
-                        aggregator.tell(new Value(r_col[self] + a_row[self], self), self());
-                    } else {
-                        if(self == 0)System.out.println("Iterazione " + iteration + " completata!");
-                        sendResponsibility();
-                    }
+                    if (this.iteration % 100 == 99)
+                        aggregator.tell(new Value(r_col[self] + a_row[self], self, iteration), self());
 
+                    if(self == 0)System.out.println("Iterazione " + iteration + " completata!");
+                    sendResponsibility();
 
                     this.iteration++;
                 }
             })
 
-            .match(Die.class, msg ->{
-                System.out.println("Not usefull actor...");
-            })
-
-            .match(ReceiveTimeout.class, x -> {
-                //ignore
-            })
+            .match(Die.class, msg -> System.out.println("Not usefull actor..."))
+            .match(ReceiveTimeout.class, x -> { /*ignore*/ })
             .build();
 
     private Receive waiting = receiveBuilder()
@@ -214,27 +182,23 @@ public class Node extends AbstractActor{
                     System.out.println("Remote actor not available: " + path);
                 } else {
                     dispatcher = maybe_actor.get();
-                    dispatcher.tell(new Self(self()),self());
+                    dispatcher.tell(new Self(),self());
                     getContext().watch(dispatcher);
                     getContext().become(active, true);
                     System.out.println("Remote actor available: " + path);
                 }
             })
-            .match(ReceiveTimeout.class, x -> {
-                sendIdentifyRequest();
-            })
+            .match(ReceiveTimeout.class, msg -> sendIdentifyRequest())
             .build();
 
+
     private void sendResponsibility(){
-        if(optimize) {
-            int i = 0;
-            for (ActorRef neighbor : not_infinite_neighbors) {
+        int i = 0;
+        if(optimize) {for (ActorRef neighbor : not_infinite_neighbors) {
                 neighbor.tell(new Responsibility(r(reference[i]), self), self());
                 i++;
             }
-        } else {
-            int i = 0;
-            for (ActorRef neighbor : neighbors) {
+        } else {for (ActorRef neighbor : neighbors) {
                 neighbor.tell(new Responsibility(r(i), self), self());
                 i++;
             }
@@ -245,51 +209,38 @@ public class Node extends AbstractActor{
         // E' necessario inviare tutte le availability
         // perchè non è possibile sapere staticamente, guardando solo la similarity,
         // quale valore riceverò da nodi a distanza infinita.
-        if(false/*optimize*/) {
-            for (int i = 0; i < not_infinite_neighbors.length; i++) {
-                if (i != self)
-                    not_infinite_neighbors[i].tell(new Availability(a(reference[i]), self), self());
-            }
-        } else {
-            for (int i = 0; i < size; i++) {
-                if(i != self)
-                    neighbors[i].tell(new Availability(a(i), self), self());
-            }
-        }
+        for (int i = 0; i < self; i++)
+            neighbors[i].tell(new Availability(a(i), self), self());
+        for (int i = self + 1; i < size; i++)
+            neighbors[i].tell(new Availability(a(i), self), self());
         self().tell(new Availability(a(),self),self());
     }
 
     private double r(int k){
         double max = Util.min_double;
-        for (int i = 0; i < size; i++) {
-            if (i != k) {
-                max = Math.max(max, a_row[i] + s_row[i]);
-            }
-        }
+        // foreach except k
+        for (int i = 0; i < k; i++)
+            max = (max > (a_row[i] + s_row[i])) ? max : (a_row[i] + s_row[i]);//Math.max(max, a_row[i] + s_row[i]);
+        for (int i = k + 1; i < size; i++)
+            max = (max > (a_row[i] + s_row[i])) ? max : (a_row[i] + s_row[i]);//Math.max(max, a_row[i] + s_row[i]);
 
         return s_row[k] - max;
     }
 
     private double a(int i){
         double ret = r_col[self];
+        for(int q = 0; q < size; q++)
+            if(q != i && q != self && r_col[q] > 0.0)
+                ret += r_col[q];
 
-        for(int q = 0; q < size; q++){
-            if(q != i && q != self){
-                if(r_col[q] > 0.0) ret += r_col[q];
-            }
-        }
-
-        return Math.min(0,ret);
+        return 0 < ret ? 0 : ret;//Math.min(0,ret);
     }
 
     private double a(){
         double ret = 0.0;
-
-        for(int q = 0; q < size; q++){
-            if(q != self){
-                if(r_col[q] > 0.0) ret += r_col[q];
-            }
-        }
+        for(int q = 0; q < size; q++)
+            if(q != self && r_col[q] > 0.0)
+                ret += r_col[q];
 
         return ret;
     }

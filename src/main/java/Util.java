@@ -10,7 +10,16 @@ import java.util.Comparator;
 /**
  * Created by Simo on 10/06/2017.
  */
-public class Util {
+class Util {
+    //The IEEE 754 format has one bit reserved for the sign
+    // and the remaining bits representing the magnitude.
+    // This means that it is "symmetrical" around origo
+    // (as opposed to the Integer values, which have one more negative value).
+    // Thus the minimum value is simply the same as the maximum value,
+    // with the sign-bit changed, so yes,
+    // -Double.MAX_VALUE is the smallest possible actual number you can represent with a double.
+
+    //We are more interested to keep this value constant
     public static double min_double = Double.NEGATIVE_INFINITY;
     public static boolean isMinDouble(double value){return Double.isInfinite(value);}
 
@@ -61,6 +70,7 @@ public class Util {
                     Graph[i][i] = Double.parseDouble(line);
                     i++;
                 }
+                assert (i == size);
             } catch (IOException e) {
                 e.printStackTrace();
             }
@@ -81,12 +91,7 @@ public class Util {
         for(double[] d : input) median.add(d[2]);
 
         // si ordinano gli n dati in ordine crescente (o decrescente);
-        median.sort(new Comparator<Double>() {
-            @Override
-            public int compare(Double o1, Double o2) {
-                return (int)(o1-o2);
-            }
-        });
+        median.sort((o1, o2) -> (int)(o1-o2));
 
         // se il numero n di dati è pari
         if(median.size() % 2 == 0){
@@ -106,7 +111,7 @@ public class Util {
         return random;
     }
 
-    public static void PrintSimilarity(Double[][] Graph, int size){
+    public static void printSimilarity(double[][] Graph, int size){
         StringBuilder builder = new StringBuilder();
         builder.append("Similarity Matrix:");
         builder.append("\n");

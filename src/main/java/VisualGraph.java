@@ -7,7 +7,7 @@ import java.awt.*;
 /**
  * Created by Simone on 26/06/2017.
  */
-public class VisualGraph extends JFrame {
+class VisualGraph extends JFrame {
     public VisualGraph(int[] exemplars, int[] cluster){
         mxGraph graph = new mxGraph();
         Object parent = graph.getDefaultParent();
@@ -53,7 +53,7 @@ public class VisualGraph extends JFrame {
         int side = new Double(Math.sqrt(cluster.length)).intValue();
         //Simple chess object
         for(int i = 0; i < cluster.length; i++){
-            objects[i] = graph.insertVertex(parent,""+i, i, (i % side) * size * 2,((int)(i / side)) * size * 2, size, size);
+            objects[i] = graph.insertVertex(parent,""+i, i, (i % side) * size * 2, i / side * size * 2, size, size);
         }
     }
 
@@ -61,14 +61,13 @@ public class VisualGraph extends JFrame {
         double c_a = (2*Math.PI) / exemplars.length;
         double a = 0;
 
-        for(int i = 0 ; i < exemplars.length; i++) {
-            int e = exemplars[i];
+        for (int e : exemplars) {
             int x = (new Double(center.x + ray * Math.cos(a))).intValue();
             int y = (new Double(center.y + ray * Math.sin(a))).intValue();
             objects[e] = graph.insertVertex(parent, "" + e, e, x, y, size, size);
 
             int localRay;
-            if(exemplars.length > 1) {
+            if (exemplars.length > 1) {
                 localRay = (new Double(0.9 * ray * Math.sin(Math.PI / exemplars.length))).intValue();
             } else {
                 localRay = ray;
@@ -81,11 +80,11 @@ public class VisualGraph extends JFrame {
                 }
             }
 
-            if(localCluster > 0) {
+            if (localCluster > 0) {
                 double c_localA = (2 * Math.PI) / localCluster;
                 double localA = 0;
                 for (int j = 0; j < cluster.length; j++) {
-                    if (cluster[j] == e && !isExemplar(j,exemplars)) {
+                    if (cluster[j] == e && !isExemplar(j, exemplars)) {
                         int localX = (new Double(x + localRay * Math.cos(localA))).intValue();
                         int localY = (new Double(y + localRay * Math.sin(localA))).intValue();
                         objects[j] = graph.insertVertex(parent, "" + j, j, localX, localY, size, size);

@@ -5,7 +5,7 @@ import akka.actor.Props;
 /**
  * Created by Simo on 18/06/2017.
  */
-public class Dispatcher extends AbstractActor {
+class Dispatcher extends AbstractActor {
     private int size;
     private double[][] Graph;
     private double lambda;
@@ -16,11 +16,11 @@ public class Dispatcher extends AbstractActor {
 
     private int ready;
 
-    static public Props props(int size, double[][] Graph, double lambda, ActorRef aggregator) {
-        return Props.create(Dispatcher.class, () -> new Dispatcher(size,Graph,lambda,aggregator));
+    static public Props props(double[][] Graph, int size, double lambda, ActorRef aggregator) {
+        return Props.create(Dispatcher.class, () -> new Dispatcher(Graph,size,lambda,aggregator));
     }
 
-    public Dispatcher(int size, double[][] Graph, double lambda, ActorRef aggregator){
+    private Dispatcher(double[][] Graph, int size, double lambda, ActorRef aggregator){
         this.size = size;
         this.Graph = Graph;
         this.lambda = lambda;

@@ -5,70 +5,67 @@ import akka.event.Logging;
 import akka.event.LoggingAdapter;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 
 /**
  * Created by Simo on 05/06/2017.
  */
-public class Aggregator extends AbstractActor {
+class Aggregator extends AbstractActor {
     private double[][] similarity;
     private int size;
 
-    private ArrayList<ActorRef> nodes;
-    private ArrayList<Integer> exemplars;
-    private int[] cluster;
-    private int received;
+    private HashMap<Long,double[]> values;
+    //private ArrayList<ActorRef> nodes;
+    //private ArrayList<Integer> exemplars;
+    //private int[] cluster;
 
     private LoggingAdapter log = Logging.getLogger(getContext().getSystem(), this);
-
 
     static public Props props(double[][] similarity, int size) {
         return Props.create(Aggregator.class, () -> new Aggregator(similarity,size));
     }
 
-    public Aggregator(double[][] similarity, int size){
+    private Aggregator(double[][] similarity, int size){
         this.similarity = similarity;
         this.size = size;
-
-        init();
+        this.values = new HashMap<>();
     }
 
     @Override
     public Receive createReceive() {
         return receiveBuilder()
         .match(Value.class, value -> {
-            nodes.add(sender());
-            received++;
+            if(! values.containsKey(value.iteration))
+                values.put(value.iteration,new double[size+1]);
 
-            if (value.value > 0 && !exemplars.contains(value.sender))
-                exemplars.add(value.sender);
+            //current[size] = numero di valori ricevuti dai nodi per quell'iterazione
+            double[] current = values.get(value.iteration);
+            current[value.sender] = value.value;
+            current[size] += 1;
 
-            if(received == size){
-                buildCluster();
+            if(current[size] == size){
+                ArrayList<Integer> exemplars = new ArrayList<>();
+                for(int i = 0; i < size; i++)
+                    if(current[i] > 0 && !exemplars.contains(i))
+                        exemplars.add(i);
 
-                ActorRef[] nodes_copy = new ActorRef[nodes.size()];
-                nodes.toArray(nodes_copy);
-                init();
+                int[] e = new int[exemplars.size()];
+                for(int i= 0; i < exemplars.size(); i++) e[i] = exemplars.get(i);
+                buildCluster(e);
 
-                for(ActorRef node : nodes_copy)
-                    node.tell(new Start(),ActorRef.noSender());
+                values.remove(value.iteration);
             }
         })
         .build();
     }
 
-    private void init(){
-        this.nodes = new ArrayList<>();
-        this.exemplars = new ArrayList<>();
-        this.cluster = new int[size];
-        this.received = 0;
-    }
-
-    private void buildCluster(){
+    private void buildCluster(int[] exemplars){
+        int[] cluster = new int[size];
         //Creazione del cluster
         for (int i = 0; i < size; i++) {
             Double max = Util.min_double;
             int index = -1;
-            for (Integer k : exemplars) {
+            for (int k : exemplars) {
                 if (max < similarity[i][k]) {
                     max = similarity[i][k];
                     index = k;
@@ -77,17 +74,9 @@ public class Aggregator extends AbstractActor {
             cluster[i] = index;
         }
 
-        for (int i = 0; i < size; i++) {
+        for (int i = 0; i < size; i++)
             log.info(i + " belong to " + cluster[i]);
-        }
 
-        // exemplars : arraylist of integer
-        Object[] o = exemplars.toArray();
-        int[] e = new int[exemplars.size()];
-
-        for(int i=0;i<e.length;i++)
-            e[i]=(int)o[i];
-
-        (new VisualGraph(e,cluster)).show(800,800);
+        (new VisualGraph(exemplars,cluster)).show(800,800);
     }
 }
