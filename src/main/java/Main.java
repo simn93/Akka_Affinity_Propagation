@@ -37,11 +37,11 @@ public class Main {
             system = ActorSystem.create("creationSystem", ConfigFactory.load("creation"));
         }
 
-        String default_file = "./simple_test.txt";//"C:/Users/Simone/Downloads/FaceClusteringSimilarities/FaceClusteringSimilarities.txt";//"./infinity_test.txt";
+        String default_file = "C:/Users/Simo/Downloads/FaceClusteringSimilarities.txt";//"./infinity_test.txt";
         if(args.length > 1) default_file = args[1];
 
-        String pref = "C:/Users/Simone/Downloads/FaceClusteringSimilarities/FaceClusteringPreferences.txt";
-        double[][] graph = Util.buildGraph(default_file, "  ", "", true, 0);
+        String pref = "C:/Users/Simo/Downloads/FaceClusteringPreferences.txt";
+        double[][] graph = Util.buildGraph(default_file, "  ", pref, false, 0);
         int size = graph.length;
 
         Util.printSimilarity(graph,size);

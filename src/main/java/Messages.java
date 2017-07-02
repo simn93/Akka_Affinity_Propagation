@@ -1,12 +1,10 @@
 import akka.actor.ActorRef;
 
-import java.io.Serializable;
-
 /**
  * Created by Simo on 05/06/2017.
  */
 
-interface Messages extends Serializable {
+interface Messages {
 }
 
 class Responsibility implements Messages {
