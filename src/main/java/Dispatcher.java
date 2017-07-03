@@ -8,7 +8,6 @@ import akka.actor.Props;
 class Dispatcher extends AbstractActor {
     private int size;
     private double[][] Graph;
-    private double lambda;
     private ActorRef aggregator;
 
     private ActorRef[] array;
@@ -16,14 +15,13 @@ class Dispatcher extends AbstractActor {
 
     private int ready;
 
-    static public Props props(double[][] Graph, int size, double lambda, ActorRef aggregator) {
-        return Props.create(Dispatcher.class, () -> new Dispatcher(Graph,size,lambda,aggregator));
+    static public Props props(double[][] Graph, int size, ActorRef aggregator) {
+        return Props.create(Dispatcher.class, () -> new Dispatcher(Graph,size,aggregator));
     }
 
-    private Dispatcher(double[][] Graph, int size, double lambda, ActorRef aggregator){
+    private Dispatcher(double[][] Graph, int size, ActorRef aggregator){
         this.size = size;
         this.Graph = Graph;
-        this.lambda = lambda;
         this.aggregator = aggregator;
 
         this.array = new ActorRef[size];
@@ -47,16 +45,17 @@ class Dispatcher extends AbstractActor {
 
                     array[index] = sender();
 
-                    sender().tell(new Initialize(lambda, row, col, index), ActorRef.noSender());
+                    sender().tell(new Initialize(row, col, index), ActorRef.noSender());
                     index++;
 
-                    System.out.println("Actor " + (index-1) + " " + sender() +" started!");
+                    //System.out.println("Actor " + (index-1) + " " + sender() +" started!");
                     //Can start
                     if (index == size) {
                         Neighbors neighbors = new Neighbors(array, size, aggregator);
                         for (int i = 0; i < size; i++) {
                             array[i].tell(neighbors, ActorRef.noSender());
                         }
+                        System.out.println("Started " + index + " actor");
                     }
                 }
             } catch (IndexOutOfBoundsException e){

@@ -3,6 +3,7 @@ import akka.actor.ActorRef;
 import akka.actor.Props;
 import akka.event.Logging;
 import akka.event.LoggingAdapter;
+import akka.japi.pf.ReceiveBuilder;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -15,10 +16,12 @@ class Aggregator extends AbstractActor {
     private int size;
 
     private HashMap<Long,double[]> values;
-    //private ArrayList<ActorRef> nodes;
-    //private ArrayList<Integer> exemplars;
-    //private int[] cluster;
+    private int[] previousCluster;
+    private long previousClusterIteration;
 
+    private ArrayList<ActorRef> nodes;
+
+    private Timer timer;
     private LoggingAdapter log = Logging.getLogger(getContext().getSystem(), this);
 
     static public Props props(double[][] similarity, int size) {
@@ -29,6 +32,9 @@ class Aggregator extends AbstractActor {
         this.similarity = similarity;
         this.size = size;
         this.values = new HashMap<>();
+
+        timer = new Timer();
+        timer.Start();
     }
 
     @Override
@@ -51,15 +57,35 @@ class Aggregator extends AbstractActor {
 
                 int[] e = new int[exemplars.size()];
                 for(int i= 0; i < exemplars.size(); i++) e[i] = exemplars.get(i);
-                buildCluster(e);
 
+                //se il cluster non cambia per k volte
+                if(!isChanged(buildCluster(e),value.iteration) &&
+                        value.iteration - previousClusterIteration > Constant.enoughIterations){
+                    //termino tutto
+                    getContext().become(killMode,true);
+                }
                 values.remove(value.iteration);
             }
         })
         .build();
     }
 
-    private void buildCluster(int[] exemplars){
+    private Receive killMode = receiveBuilder()
+            .match(Value.class, msg -> {
+                if(nodes == null) nodes = new ArrayList<>();
+                if(!nodes.contains(sender())) nodes.add(sender());
+                if(nodes.size() == size){
+                    for(ActorRef actorRef : nodes)
+                        actorRef.tell(akka.actor.PoisonPill.getInstance(),ActorRef.noSender());
+
+                    timer.Stop();
+                    log.info("Job done U_U after " + previousClusterIteration + " iterations and " + timer);
+                    context().system().terminate();
+                }
+            })
+            .build();
+
+    private int[] buildCluster(int[] exemplars){
         int[] cluster = new int[size];
         //Creazione del cluster
         for (int i = 0; i < size; i++) {
@@ -74,9 +100,31 @@ class Aggregator extends AbstractActor {
             cluster[i] = index;
         }
 
-        for (int i = 0; i < size; i++)
-            log.info(i + " belong to " + cluster[i]);
+        //for (int i = 0; i < size; i++)
+            //log.info(i + " belong to " + cluster[i]);
 
-        (new VisualGraph(exemplars,cluster)).show(800,800);
+        //(new VisualGraph(exemplars,cluster)).show(800,800);
+        return cluster;
+    }
+
+    private boolean isChanged(int[] cluster, long iteration){
+        //Se non esiste : prima iterazione
+        if(previousCluster == null){
+            previousCluster = cluster;
+            previousClusterIteration = iteration;
+            return true;
+        }
+
+        //Se c'è qualche differenza dal precedente
+        for(int i = 0; i < size; i++){
+            if(previousCluster[i] != cluster[i]){
+                previousCluster = cluster;
+                previousClusterIteration = iteration;
+                return true;
+            }
+        }
+
+        //Se non è cambiato
+        return false;
     }
 }

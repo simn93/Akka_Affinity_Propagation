@@ -37,8 +37,9 @@ class Util {
                 element[2] = Double.parseDouble(splitted[2]);
                 input.add(element);
             }
-        } catch (NullPointerException | IOException e) {
+        } catch (Exception e) {
             e.printStackTrace();
+            System.exit(1);
         }
 
         //find size
@@ -71,8 +72,9 @@ class Util {
                     i++;
                 }
                 assert (i == size);
-            } catch (IOException e) {
+            } catch (Exception e) {
                 e.printStackTrace();
+                System.exit(1);
             }
         }
 

@@ -40,13 +40,11 @@ class Neighbors implements Messages {
 }
 
 class Initialize implements Messages {
-    public double lambda;
     public double[] similarity_row;
     public double[] similarity_col;
     public int selfID;
 
-    public Initialize(double lambda, double[] similarity_row, double[] similarity_col, int selfID) {
-        this.lambda = lambda;
+    public Initialize(double[] similarity_row, double[] similarity_col, int selfID) {
         this.similarity_row = similarity_row;
         this.similarity_col = similarity_col;
         this.selfID = selfID;

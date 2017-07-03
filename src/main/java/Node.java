@@ -16,9 +16,6 @@ class Node extends AbstractActor{
     private double[] s_row;
     private double[] s_col;
 
-    //Lambda factor
-    private double lambda;
-
     //Id of Actor
     private int self;
     //------------------
@@ -44,9 +41,13 @@ class Node extends AbstractActor{
 
     // Optimizations for less messages
     private boolean optimize;
-    private int is_infinity;
-    private ActorRef[] not_infinite_neighbors;
-    private int[] reference;
+
+    private int row_infinity;
+    private int col_infinity;
+    private ActorRef[] r_not_infinite_neighbors;
+    private ActorRef[] a_not_infinite_neighbors;
+    private int[] r_reference;
+    private int[] a_reference;
 
     public Node(String path){
         this.path = path;
@@ -70,8 +71,9 @@ class Node extends AbstractActor{
         r_received = 0;
         a_received = 0;
 
+        row_infinity = 0;
+        col_infinity = 0;
         optimize = true;
-        is_infinity = 0;
     }
 
     private void sendIdentifyRequest() {
@@ -80,15 +82,15 @@ class Node extends AbstractActor{
                 .scheduleOnce(Duration.create(3, SECONDS), self(), ReceiveTimeout.getInstance(), getContext().dispatcher(), self());
     }
 
-    @Override
-    public Receive createReceive() {
+    @Override public Receive createReceive() {
         return waiting;
     }
+
+    @Override public void postStop() {context().system().terminate();}
 
     private Receive active = receiveBuilder()
             // Messaggio di init
             .match(Initialize.class, init -> {
-                this.lambda = init.lambda;
                 this.s_col = init.similarity_col;
                 this.s_row = init.similarity_row;
                 this.self = init.selfID;
@@ -106,31 +108,44 @@ class Node extends AbstractActor{
                 r_col = new double[size];
 
                 if(optimize) {
-                    int not_linked_neighbors = 0;
+                    // -/> : not send to
+                    // i -/> k responsibility if s(i,k) = -INF
+                        //r(i,k) = -INF
+                    // i -/> k availability if s(k,i) = -INF
+                        //a(i,k) != -INF
+                        //but is not influential for k when he compute r(k,j) = s(k,j) - max{a(k,i) + -INF}
                     for (int i = 0; i < size; i++) {
                         if (Util.isMinDouble(s_col[i])){ //The node which cannot reach me
-                            is_infinity++;
+                            col_infinity++;
                             r_col[i] = Util.min_double; // r initialize
+                            // i will not receive message from node which have s[k][i] = -INF
                         }
-
                         if(Util.isMinDouble(s_row[i])){ //The node i cannot reach
-                            not_linked_neighbors++;
+                            row_infinity++;
                             // a initialize : no need to do. is 0 to default
                         }
                     }
-                    this.not_infinite_neighbors = new ActorRef[size - not_linked_neighbors];
-                    this.reference = new int[size - not_linked_neighbors];
 
-                    int j = 0;
+                    r_not_infinite_neighbors = new ActorRef[size - row_infinity];
+                    a_not_infinite_neighbors = new ActorRef[size - col_infinity-1];
+                    r_reference = new int[size - row_infinity];
+                    a_reference = new int[size - col_infinity-1];
+
+                    int j = 0, k = 0;
                     for (int i = 0; i < size; i++) {
                         if (! Util.isMinDouble(s_row[i])) {
-                            this.not_infinite_neighbors[j] = neighbors[i];
-                            reference[j] = i;
+                            r_not_infinite_neighbors[j] = neighbors[i];
+                            r_reference[j] = i;
                             j++;
                         }
+                        if(! Util.isMinDouble(s_col[i]) && i != self) {
+                            a_not_infinite_neighbors[k] = neighbors[i];
+                            a_reference[k] = i;
+                            k++;
+                        }
                     }
-                    assert(j == this.reference.length);
-                    assert(j + this.not_infinite_neighbors.length == size);
+                    assert(j == this.r_reference.length);
+                    assert(j + this.r_not_infinite_neighbors.length == size);
                 }
 
                 dispatcher.tell(new Ready(),self());
@@ -143,10 +158,10 @@ class Node extends AbstractActor{
             })
 
             .match(Responsibility.class, responsibility -> {
-                r_col[responsibility.sender] = (r_col[responsibility.sender] * lambda) + (responsibility.value * (1 - lambda));
+                r_col[responsibility.sender] = (r_col[responsibility.sender] * Constant.lambda) + (responsibility.value * (1 - Constant.lambda));
                 r_received++;
 
-                if (r_received == size - is_infinity) {
+                if (r_received == size - col_infinity) {
                     r_received = 0;
 
                     sendAvailability();
@@ -154,14 +169,14 @@ class Node extends AbstractActor{
             })
 
             .match(Availability.class, availability -> {
-                a_row[availability.sender] = (a_row[availability.sender] * lambda) + (availability.value * (1 - lambda));
+                a_row[availability.sender] = (a_row[availability.sender] * Constant.lambda) + (availability.value * (1 - Constant.lambda));
                 a_received++;
 
-                if (a_received == size) {
+                if (a_received == size - row_infinity) {
                     a_received = 0;
 
                     //Iteration's end
-                    if (this.iteration % 100 == 99)
+                    if (this.iteration % (Constant.sendEach) == (Constant.sendEach - 1))
                         aggregator.tell(new Value(r_col[self] + a_row[self], self, iteration), self());
 
                     if(self == 0)System.out.println("Iterazione " + iteration + " completata!");
@@ -194,8 +209,8 @@ class Node extends AbstractActor{
 
     private void sendResponsibility(){
         int i = 0;
-        if(optimize) {for (ActorRef neighbor : not_infinite_neighbors) {
-                neighbor.tell(new Responsibility(r(reference[i]), self), self());
+        if(optimize) {for (ActorRef neighbor : r_not_infinite_neighbors) {
+                neighbor.tell(new Responsibility(r(r_reference[i]), self), self());
                 i++;
             }
         } else {for (ActorRef neighbor : neighbors) {
@@ -206,14 +221,19 @@ class Node extends AbstractActor{
     }
 
     private void sendAvailability(){
-        // E' necessario inviare tutte le availability
-        // perchè non è possibile sapere staticamente, guardando solo la similarity,
-        // quale valore riceverò da nodi a distanza infinita.
-        for (int i = 0; i < self; i++)
-            neighbors[i].tell(new Availability(a(i), self), self());
-        for (int i = self + 1; i < size; i++)
-            neighbors[i].tell(new Availability(a(i), self), self());
-        self().tell(new Availability(a(),self),self());
+        if(optimize){
+            int i = 0;
+            for(ActorRef neighbor : a_not_infinite_neighbors) {
+                neighbor.tell(new Availability(a(a_reference[i]),self), self());
+                i++;
+            }
+        } else {
+            for (int i = 0; i < self; i++)
+                neighbors[i].tell(new Availability(a(i), self), self());
+            for (int i = self + 1; i < size; i++)
+                neighbors[i].tell(new Availability(a(i), self), self());
+        }
+        self().tell(new Availability(a(),self), self());
     }
 
     private double r(int k){

@@ -7,9 +7,9 @@ sourceCompatibility = 1.8
 //create a single Jar with all dependencies
 task fatJar(type: Jar) {
     manifest {
-        attributes 'Implementation-Title': 'Gradle Jar File Example',
+        attributes 'Implementation-Title': 'Akka Affinity Propagation',
                 'Implementation-Version': version,
-                'Main-Class': 'MainNode'
+                'Main-Class': 'Main'
     }
     baseName = project.name + '-all'
     from { configurations.compile.collect { it.isDirectory() ? it : zipTree(it) } }
@@ -22,16 +22,8 @@ repositories {
 
 dependencies {
     compile group: 'com.typesafe.akka', name: 'akka-actor_2.11', version: '2.5.2'
-    //compile group: 'com.typesafe.akka', name: 'akka-cluster_2.11', version: '2.5.2'
-    //compile group: "com.lightbend.akka", name: "akka-management-cluster-http_2.11", version: "0.3"
     compile group: "com.typesafe.akka", name: "akka-remote_2.11", version: '2.5.2'
-    //compile group: "com.typesafe.akka", name: "akka-persistence", version: '2.11'
-    //compile group: "org.iq80.leveldb", name: "leveldb", version: "0.7"
-    //compile group: "org.fusesource.leveldbjni", name: "leveldbjni-all", version: "1.8"
-    //compile group: "com.typesafe.akka", name: "akka-testkit", version: '2.11'
-    //compile group: "com.novocode", name: "junit-interface", version: "0.9"
-    //compile group: "commons-io", name: "commons-io", version: "2.4"
     compile group: 'org.tinyjee.jgraphx', name: 'jgraphx', version: '1.10.1.3'
     compile group: 'com.github.romix.akka', name: 'akka-kryo-serialization_2.11', version: '0.4.0'
-
+    compile group: 'joda-time', name: 'joda-time', version: '2.9.9'
 }

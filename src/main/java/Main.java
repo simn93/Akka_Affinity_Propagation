@@ -11,9 +11,6 @@ public class Main {
     private static String[] nodes_IP = new String[]{"10.101.5.30"};
     private static int remotePort = 2553;
 
-    //Algorithm lambda
-    private final static Double lambda = 0.8;
-
     //Variabile di debug
     //Effettua il deploy dei nodi in loopback
     private static boolean debug = true;
@@ -37,17 +34,17 @@ public class Main {
             system = ActorSystem.create("creationSystem", ConfigFactory.load("creation"));
         }
 
-        String default_file = "C:/Users/Simo/Downloads/FaceClusteringSimilarities.txt";//"./infinity_test.txt";
+        String default_file = "C:/Users/Simone/Downloads/FaceClusteringSimilarities.txt";//"./infinity_test.txt";
         if(args.length > 1) default_file = args[1];
 
-        String pref = "C:/Users/Simo/Downloads/FaceClusteringPreferences.txt";
-        double[][] graph = Util.buildGraph(default_file, "  ", pref, false, 0);
+        String pref = "C:/Users/Simone/Downloads/FaceClusteringPreferences.txt";
+        double[][] graph = Util.buildGraph(default_file, "  ", pref, false, Constant.sigma);
         int size = graph.length;
 
-        Util.printSimilarity(graph,size);
+        //Util.printSimilarity(graph,size);
 
         ActorRef aggregator = system.actorOf(Aggregator.props(graph, size),"aggregator");
-        ActorRef dispatcher = system.actorOf(Dispatcher.props(graph, size,lambda,aggregator), "creator");
+        ActorRef dispatcher = system.actorOf(Dispatcher.props(graph, size, aggregator), "creator");
 
         //Address build
         Address[] nodes_address = new Address[nodes_IP.length];
