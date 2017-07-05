@@ -1,6 +1,8 @@
 import akka.actor.*;
 import scala.concurrent.duration.Duration;
+
 import java.util.Optional;
+
 import static java.util.concurrent.TimeUnit.SECONDS;
 
 /**
@@ -60,6 +62,8 @@ class Node extends AbstractActor{
         this.dispatcher = dispatcher;
         standardSetting();
 
+        //long waitTime = Math.round(Math.random() * 10 * 100000);
+        //getContext().system().scheduler().scheduleOnce(Duration.create(waitTime,MILLISECONDS),dispatcher,new Self(),getContext().dispatcher(),self());
         dispatcher.tell(new Self(),self());
         getContext().watch(dispatcher);
         getContext().become(active, true);

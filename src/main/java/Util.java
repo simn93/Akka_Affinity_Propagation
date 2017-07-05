@@ -5,7 +5,6 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
-import java.util.Comparator;
 
 /**
  * Created by Simo on 10/06/2017.
@@ -86,6 +85,53 @@ class Util {
         }
 
         return Graph;
+    }
+
+    public static double[][] buildGraph(String matrix_file, double preference, boolean use_preference, boolean zeroAsInf, double sigma){
+        //file read
+        ArrayList<double[]> input = new ArrayList<>();
+        int size = -1;
+        boolean first = true;
+        double[][] Graph = new double[0][0];
+        int row = 0;
+
+        try(BufferedReader reader = new BufferedReader( new InputStreamReader( new FileInputStream(matrix_file), "UTF-8"))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                String[] split = line.split(",");
+                if(first){
+                    size = split.length;
+                    Graph = new double[size][size];
+                    first = false;
+                }
+
+                for(int col = 0; col < size; col++){
+                    Graph[row][col] = Double.parseDouble(split[col]) + getNoise(sigma);
+                    if(zeroAsInf && Graph[row][col] == 0.0) Graph[row][col] = Util.min_double;
+                    if(use_preference && row == col) Graph[row][col] = preference;
+                }
+                row++;
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+            System.exit(1);
+        }
+
+        return Graph;
+    }
+
+    public static double[][] buildGraphRandom(int size){
+        double[][] graph = new double[size][size];
+
+        for(int r = 0; r < size; r++){
+            for(int c = 0; c < size; c++){
+                double rand = -Math.random() * 1000;
+                graph[r][c] = rand < -300 ? rand : min_double;
+                if(r==c)graph[r][c] = rand;
+            }
+        }
+
+        return graph;
     }
 
     private static double GetMedian(ArrayList<double[]> input){
