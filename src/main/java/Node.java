@@ -2,12 +2,14 @@ import akka.actor.*;
 import scala.concurrent.duration.Duration;
 
 import java.util.Optional;
+import java.util.stream.IntStream;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
 
 /**
  * Created by Simo on 03/06/2017.
  */
+@SuppressWarnings("DefaultFileTemplate")
 class Node extends AbstractActor{
     // Connection variable
     private ActorRef dispatcher;
@@ -40,6 +42,8 @@ class Node extends AbstractActor{
     private int r_received;
     private int a_received;
     //------------------
+    // Optimizations for less computation
+    private boolean sendOptimize;
 
     // Optimizations for less messages
     private boolean optimize;
@@ -77,6 +81,7 @@ class Node extends AbstractActor{
 
         row_infinity = 0;
         col_infinity = 0;
+        sendOptimize = true;
         optimize = true;
     }
 
@@ -90,9 +95,9 @@ class Node extends AbstractActor{
         return waiting;
     }
 
-    @Override public void postStop() {context().system().terminate();}
+    @Override public void postStop() {getContext().system().terminate();}
 
-    private Receive active = receiveBuilder()
+    private final Receive active = receiveBuilder()
             // Messaggio di init
             .match(Initialize.class, init -> {
                 this.s_col = init.similarity_col;
@@ -131,9 +136,9 @@ class Node extends AbstractActor{
                     }
 
                     r_not_infinite_neighbors = new ActorRef[size - row_infinity];
-                    a_not_infinite_neighbors = new ActorRef[size - col_infinity-1];
+                    a_not_infinite_neighbors = new ActorRef[size - col_infinity];
                     r_reference = new int[size - row_infinity];
-                    a_reference = new int[size - col_infinity-1];
+                    a_reference = new int[size - col_infinity];
 
                     int j = 0, k = 0;
                     for (int i = 0; i < size; i++) {
@@ -142,14 +147,14 @@ class Node extends AbstractActor{
                             r_reference[j] = i;
                             j++;
                         }
-                        if(! Util.isMinDouble(s_col[i]) && i != self) {
+                        if(! Util.isMinDouble(s_col[i])) {
                             a_not_infinite_neighbors[k] = neighbors[i];
                             a_reference[k] = i;
                             k++;
                         }
                     }
-                    assert(j == this.r_reference.length);
-                    assert(j + this.r_not_infinite_neighbors.length == size);
+                    //assert(j == r_reference.length);
+                    //assert(j + row_infinity == size);
                 }
 
                 dispatcher.tell(new Ready(),self());
@@ -194,7 +199,7 @@ class Node extends AbstractActor{
             .match(ReceiveTimeout.class, x -> { /*ignore*/ })
             .build();
 
-    private Receive waiting = receiveBuilder()
+    private final Receive waiting = receiveBuilder()
             .match(ActorIdentity.class, identity -> {
                 Optional<ActorRef> maybe_actor = identity.getActorRef();
                 if (! maybe_actor.isPresent()) {
@@ -212,32 +217,91 @@ class Node extends AbstractActor{
 
 
     private void sendResponsibility(){
-        int i = 0;
-        if(optimize) {for (ActorRef neighbor : r_not_infinite_neighbors) {
-                neighbor.tell(new Responsibility(r(r_reference[i]), self), self());
-                i++;
-            }
-        } else {for (ActorRef neighbor : neighbors) {
-                neighbor.tell(new Responsibility(r(i), self), self());
-                i++;
-            }
+        ActorRef[] sendVector;
+        int[] sendIndex;
+        int sendSize;
+        double[] sendValue;
+
+        if(optimize){
+            sendVector = r_not_infinite_neighbors;
+            sendIndex = r_reference;
+            sendSize = r_not_infinite_neighbors.length;
+        } else {
+            sendVector = neighbors;
+            sendIndex = IntStream.range(0, size).toArray();
+            sendSize = size;
         }
+        sendValue = new double[sendSize];
+
+        if(sendOptimize) {
+            double firstMax, secondMax;
+            int firstK = -1;
+            firstMax = secondMax = Util.min_double;
+
+            for (int i = 0; i < size; i++) {
+                double value = a_row[i] + s_row[i];
+                if (firstMax <= value) {
+                    secondMax = firstMax;
+                    firstMax = value;
+                    firstK = i;
+                } else if (secondMax <= value) secondMax = value;
+            }
+
+            for(int i = 0; i < sendSize; i++)
+                sendValue[i] = r(sendIndex[i],firstK,firstMax,secondMax);
+                //String debug = "";
+                //for(int j = 0; j < size; j++) if(!Util.isMinDouble(a_row[j]+s_row[j])) debug+=a_row[j]+s_row[j]+" ";
+                //assert (sendValue[i] == r(sendIndex[i])) : sendValue[i] + " " + r(sendIndex[i]) + " " +firstK + " " + firstMax + " " + secondMax + " " + debug;
+                //assert (r(sendIndex[i]) == r(r_reference[i]));
+        } else
+            for(int i = 0; i < sendSize; i++)
+                sendValue[i] = r(sendIndex[i]);
+
+        for (int i = 0; i < sendSize; i++)
+            sendVector[i].tell(new Responsibility(sendValue[i], self), self());
+            //assert (sendValue[i] == r(r_reference[i]));
+            //assert (sendVector[i].compareTo(r_not_infinite_neighbors[i]) == 0);
     }
 
     private void sendAvailability(){
+        ActorRef[] sendVector;
+        int[] sendIndex;
+        int sendSize;
+        double[] sendValue;
+
         if(optimize){
-            int i = 0;
-            for(ActorRef neighbor : a_not_infinite_neighbors) {
-                neighbor.tell(new Availability(a(a_reference[i]),self), self());
-                i++;
-            }
+            sendVector = a_not_infinite_neighbors;
+            sendIndex = a_reference;
+            sendSize = a_not_infinite_neighbors.length;
         } else {
-            for (int i = 0; i < self; i++)
-                neighbors[i].tell(new Availability(a(i), self), self());
-            for (int i = self + 1; i < size; i++)
-                neighbors[i].tell(new Availability(a(i), self), self());
+            sendVector = neighbors;
+            sendIndex = IntStream.range(0, size).toArray();
+            sendSize = size;
         }
-        self().tell(new Availability(a(),self), self());
+        sendValue = new double[sendSize];
+
+        if(sendOptimize){
+            double sum = r_col[self];
+            for(int q = 0; q < size; q++)
+                if(q != self && r_col[q] > 0.0)
+                    sum += r_col[q];
+
+            for(int i = 0; i < sendSize; i++){
+                if(sendIndex[i] != self) {
+                    sendValue[i] = a(sendIndex[i], sum);
+                    //assert ((a(sendIndex[i],sum) - a(sendIndex[i])) < 10e-6);
+                    //assert (a(sendIndex[i]) == a(a_reference[i]));
+                } else
+                    sendValue[i] = a(sum);
+                    //assert ((a(sum) - a()) < 10e-6);
+            }
+        } else
+            for(int i = 0; i < sendSize; i++)
+                if (sendIndex[i] != self) { sendValue[i] = a(sendIndex[i]); }
+                    else sendValue[i] = a();
+
+        for (int i = 0; i < sendSize; i++)
+            sendVector[i].tell(new Availability(sendValue[i], self), self());
     }
 
     private double r(int k){
@@ -251,6 +315,10 @@ class Node extends AbstractActor{
         return s_row[k] - max;
     }
 
+    private double r(int k, int firstK, double firstMax, double secondMax){
+        return (k == firstK ? s_row[k] - secondMax : s_row[k] - firstMax);
+    }
+
     private double a(int i){
         double ret = r_col[self];
         for(int q = 0; q < size; q++)
@@ -260,6 +328,11 @@ class Node extends AbstractActor{
         return 0 < ret ? 0 : ret;//Math.min(0,ret);
     }
 
+    private double a(int i, double sum){
+        if(r_col[i] > 0.0) sum -= r_col[i];
+        return 0 < sum ? 0 : sum;
+    }
+
     private double a(){
         double ret = 0.0;
         for(int q = 0; q < size; q++)
@@ -267,5 +340,9 @@ class Node extends AbstractActor{
                 ret += r_col[q];
 
         return ret;
+    }
+
+    private double a(double sum){
+        return sum - r_col[self];
     }
 }

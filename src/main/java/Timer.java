@@ -1,7 +1,3 @@
-/**
- * Created by Simone on 03/07/2017.
- */
-
 import org.joda.time.Duration;
 import org.joda.time.Period;
 import org.joda.time.format.PeriodFormatter;
@@ -13,7 +9,7 @@ import org.joda.time.format.PeriodFormatterBuilder;
  *
  * @author Simone Schirinzi
  */
-public class Timer{
+class Timer{
 
     /** Istante da cui iniziare a contare */
     private long startTime;
@@ -22,10 +18,10 @@ public class Timer{
     private long endTime;
 
     /** Modalità di stampa dell'intervallo */
-    private PeriodFormatter fmt;
+    private final PeriodFormatter fmt;
 
     /** Inizializza il timer stampando il tempo nel formato: "D h m:s.ms" */
-    public Timer(){
+    Timer(){
         fmt = new PeriodFormatterBuilder()
                 .printZeroAlways()
                 .minimumPrintedDigits(1)

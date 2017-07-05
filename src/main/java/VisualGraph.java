@@ -7,6 +7,7 @@ import java.awt.*;
 /**
  * Created by Simone on 26/06/2017.
  */
+@SuppressWarnings({"unused", "DefaultFileTemplate"})
 class VisualGraph extends JFrame {
     public VisualGraph(int[] exemplars, int[] cluster){
         mxGraph graph = new mxGraph();

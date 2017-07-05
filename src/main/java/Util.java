@@ -9,6 +9,7 @@ import java.util.ArrayList;
 /**
  * Created by Simo on 10/06/2017.
  */
+@SuppressWarnings("DefaultFileTemplate")
 class Util {
     //The IEEE 754 format has one bit reserved for the sign
     // and the remaining bits representing the magnitude.
@@ -19,9 +20,10 @@ class Util {
     // -Double.MAX_VALUE is the smallest possible actual number you can represent with a double.
 
     //We are more interested to keep this value constant
-    public static double min_double = Double.NEGATIVE_INFINITY;
+    public static final double min_double = Double.NEGATIVE_INFINITY;
     public static boolean isMinDouble(double value){return Double.isInfinite(value);}
 
+    @SuppressWarnings("SameParameterValue")
     public static double[][] buildGraph(String similarity_file, String similarity_regex, String preference_file, boolean median_preference, double sigma){
         //File Read
         ArrayList<double[]> input = new ArrayList<>();
@@ -87,9 +89,9 @@ class Util {
         return Graph;
     }
 
+    @SuppressWarnings("unused")
     public static double[][] buildGraph(String matrix_file, double preference, boolean use_preference, boolean zeroAsInf, double sigma){
         //file read
-        ArrayList<double[]> input = new ArrayList<>();
         int size = -1;
         boolean first = true;
         double[][] Graph = new double[0][0];
@@ -120,6 +122,7 @@ class Util {
         return Graph;
     }
 
+    @SuppressWarnings("unused")
     public static double[][] buildGraphRandom(int size){
         double[][] graph = new double[size][size];
 
@@ -159,6 +162,7 @@ class Util {
         return random;
     }
 
+    @SuppressWarnings("unused")
     public static void printSimilarity(double[][] Graph, int size){
         StringBuilder builder = new StringBuilder();
         builder.append("Similarity Matrix:");

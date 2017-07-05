@@ -5,15 +5,18 @@ import com.typesafe.config.ConfigFactory;
 /**
  * Created by Simo on 17/06/2017.
  */
+@SuppressWarnings("DefaultFileTemplate")
 public class Main {
     //Cluster nodes_IP
     //Elenco di IP su cui effettuare il deploy dei nodi
+    @SuppressWarnings("CanBeFinal")
     private static String[] nodes_IP = new String[]{"10.101.5.30"};
+    @SuppressWarnings({"FieldCanBeLocal", "CanBeFinal"})
     private static int remotePort = 2553;
 
     //Variabile di debug
     //Effettua il deploy dei nodi in loopback
-    private static boolean debug = true;
+    private static final boolean debug = true;
 
     public static void main(String[] args) {
         if(debug)
@@ -32,12 +35,12 @@ public class Main {
         if(args.length > 1) default_file = args[1];
 
         //String pref = "C:\\Users\\Simo\\Documents\\Dataset\\GeneFinding_p.txt";
-        //double[][] graph = Util.buildGraph(default_file, "  ", pref, false, Constant.sigma);
+        double[][] graph = Util.buildGraph(default_file, "  ", "", true, Constant.sigma);
         //double[][] graph = Util.buildGraph("C://Users/Simo/Documents/Dataset/exons.txt",-2,true,true, Constant.sigma);
-        double[][] graph = Util.buildGraphRandom(5000);
+        //double[][] graph = Util.buildGraphRandom(5000);
         int size = graph.length;
 
-        Util.printSimilarity(graph,size);
+        //Util.printSimilarity(graph,size);
         //Address build
         Address[] nodes_address = new Address[nodes_IP.length];
         for(int i = 0; i < nodes_IP.length; i++)

@@ -5,17 +5,18 @@ import akka.actor.Props;
 /**
  * Created by Simo on 18/06/2017.
  */
+@SuppressWarnings("DefaultFileTemplate")
 class Dispatcher extends AbstractActor {
-    private int size;
-    private double[][] Graph;
-    private ActorRef aggregator;
+    private final int size;
+    private final double[][] Graph;
+    private final ActorRef aggregator;
 
-    private ActorRef[] array;
+    private final ActorRef[] array;
     private int index;
 
     private int ready;
 
-    static public Props props(double[][] Graph, int size, ActorRef aggregator) {
+    static Props props(double[][] Graph, int size, ActorRef aggregator) {
         return Props.create(Dispatcher.class, () -> new Dispatcher(Graph,size,aggregator));
     }
 

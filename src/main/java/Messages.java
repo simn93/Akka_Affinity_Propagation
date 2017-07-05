@@ -4,33 +4,34 @@ import akka.actor.ActorRef;
  * Created by Simo on 05/06/2017.
  */
 
+@SuppressWarnings("DefaultFileTemplate")
 interface Messages {
 }
 
 class Responsibility implements Messages {
-    public Double value;
-    public int sender;
+    public final double value;
+    public final int sender;
 
-    public Responsibility (Double value, int sender){
+    public Responsibility (double value, int sender){
         this.value = value;
         this.sender = sender;
     }
 }
 
 class Availability implements Messages {
-    public Double value;
-    public int sender;
+    public final double value;
+    public final int sender;
 
-    public Availability (Double value, int sender){
+    public Availability (double value, int sender){
         this.value = value;
         this.sender = sender;
     }
 }
 
 class Neighbors implements Messages {
-    public ActorRef[] array;
-    public int size;
-    public ActorRef aggregator;
+    public final ActorRef[] array;
+    public final int size;
+    public final ActorRef aggregator;
 
     public Neighbors(ActorRef[] array, int size, ActorRef aggregator){
         this.array = array;
@@ -40,9 +41,9 @@ class Neighbors implements Messages {
 }
 
 class Initialize implements Messages {
-    public double[] similarity_row;
-    public double[] similarity_col;
-    public int selfID;
+    public final double[] similarity_row;
+    public final double[] similarity_col;
+    public final int selfID;
 
     public Initialize(double[] similarity_row, double[] similarity_col, int selfID) {
         this.similarity_row = similarity_row;
@@ -52,9 +53,9 @@ class Initialize implements Messages {
 }
 
 class Value implements Messages {
-    public Double value;
-    public int sender;
-    public long iteration;
+    public final Double value;
+    public final int sender;
+    public final long iteration;
 
     public Value(Double value, int sender, long iteration){
         this.value = value;

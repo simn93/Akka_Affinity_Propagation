@@ -3,28 +3,29 @@ import akka.actor.ActorRef;
 import akka.actor.Props;
 import akka.event.Logging;
 import akka.event.LoggingAdapter;
-import akka.japi.pf.ReceiveBuilder;
-
 import java.util.ArrayList;
 import java.util.HashMap;
 
 /**
  * Created by Simo on 05/06/2017.
  */
+@SuppressWarnings("DefaultFileTemplate")
 class Aggregator extends AbstractActor {
-    private double[][] similarity;
+    private final double[][] similarity;
+    @SuppressWarnings("CanBeFinal")
     private int size;
 
-    private HashMap<Long,double[]> values;
+    private final HashMap<Long,double[]> values;
     private int[] previousCluster;
     private long previousClusterIteration;
 
     private ArrayList<ActorRef> nodes;
 
+    @SuppressWarnings("CanBeFinal")
     private Timer timer;
-    private LoggingAdapter log = Logging.getLogger(getContext().getSystem(), this);
+    private final LoggingAdapter log = Logging.getLogger(getContext().getSystem(), this);
 
-    static public Props props(double[][] similarity, int size) {
+    static Props props(double[][] similarity, int size) {
         return Props.create(Aggregator.class, () -> new Aggregator(similarity,size));
     }
 
@@ -70,7 +71,7 @@ class Aggregator extends AbstractActor {
         .build();
     }
 
-    private Receive killMode = receiveBuilder()
+    private final Receive killMode = receiveBuilder()
             .match(Value.class, msg -> {
                 if(nodes == null) nodes = new ArrayList<>();
                 if(!nodes.contains(sender())) nodes.add(sender());
