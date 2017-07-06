@@ -4,23 +4,25 @@ import org.joda.time.format.PeriodFormatter;
 import org.joda.time.format.PeriodFormatterBuilder;
 
 /**
- * Semplice classe per la gestione di un Timer.
- * Sfrutta la org.joda.time Library.
+ * Simple class for managing a Timer.
+ * Use org.joda.time Library.
  *
  * @author Simone Schirinzi
  */
 class Timer{
 
-    /** Istante da cui iniziare a contare */
+    /** Instant to start counting */
     private long startTime;
 
-    /** Istante in cui finire di contare */
+    /** Instant to stop counting */
     private long endTime;
 
-    /** Modalità di stampa dell'intervallo */
+    /** Interval Printing Mode */
     private final PeriodFormatter fmt;
 
-    /** Inizializza il timer stampando il tempo nel formato: "D h m:s.ms" */
+    /**
+     * Initialize the timer by printing time in the format : "D h m:s.ms"
+     * */
     Timer(){
         fmt = new PeriodFormatterBuilder()
                 .printZeroAlways()
@@ -37,31 +39,31 @@ class Timer{
     }
 
     /**
-     * Avvia il cronometro, settando startTime ai millisecondi correnti.
-     *
+     * Start the stopwatch, setting startTime to the current milliseconds.
      * */
-    public void Start(){
+    public void start(){
         this.startTime = System.currentTimeMillis();
     }
 
-    /** Termina il cronometro, settando endTime ai millisecondi correnti */
-    public void Stop(){
+    /**
+     * End the stopwatch, setting endTime to the current milliseconds.
+     * */
+    public void stop(){
         this.endTime = System.currentTimeMillis();
     }
 
-    /** Ottengo il periodo trascorso */
+    /**
+     * Get the time elapsed.
+     * */
     private String getDate(){
 
-		/* Converte i due istanti di tempo in un valore, in millisecondi,
-		 * rappresentante quanto tempo � trascorso. */
+        /* Converts two time instants to a value in milliseconds, representing how long it has elapsed. */
         Duration timer = new Duration(this.startTime,this.endTime);
 
-		/*Converte i millisecondi in un un periodo formattato in diversi campi: anni, ore, secondi, ecc...*/
+		/* Converts the milliseconds into a formatted period in different fields: years, hours, seconds, etc ... */
         Period p = timer.toPeriod();
 
-		/* Converto il perido in una stringa, secondo come deciso
-		 * in fase di inizializzazione
-		 */
+		/* Converts the period in a string, as decided in initialization */
         return fmt.print(p);
     }
 

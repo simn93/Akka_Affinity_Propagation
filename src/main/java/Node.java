@@ -1,53 +1,48 @@
 import akka.actor.*;
-import scala.concurrent.duration.Duration;
-
-import java.util.Optional;
 import java.util.stream.IntStream;
 
-import static java.util.concurrent.TimeUnit.SECONDS;
-
 /**
- * Created by Simo on 03/06/2017.
+ * Class for cloud node management
+ *
+ * @author Simone Schirinzi
  */
-@SuppressWarnings("DefaultFileTemplate")
 class Node extends AbstractActor{
     // Connection variable
     private ActorRef dispatcher;
-    private String path;
+    private ActorRef aggregator;
     //------------------
+
     // Received from Initialize
     //Similarity
     private double[] s_row;
     private double[] s_col;
-
     //Id of Actor
     private int self;
     //------------------
+
     // Received from Neighbors
     private ActorRef[] neighbors;
-    private ActorRef aggregator;
     private int size;
     //------------------
+
     // Iteration variable
     // Iteration counter
     private long iteration;
-
     // Memorization of value received
     // x_col[q] = x[q][this]
     private double[] r_col;
     // x_row[q] = x[this][q]
     private double[] a_row;
-
     // Received values counter
     private int r_received;
     private int a_received;
     //------------------
+
     // Optimizations for less computation
     private boolean sendOptimize;
-
     // Optimizations for less messages
     private boolean optimize;
-
+    //...
     private int row_infinity;
     private int col_infinity;
     private ActorRef[] r_not_infinite_neighbors;
@@ -55,166 +50,126 @@ class Node extends AbstractActor{
     private int[] r_reference;
     private int[] a_reference;
 
-    public Node(String path){
-        this.path = path;
-        standardSetting();
-
-        sendIdentifyRequest();
-    }
-
-    public Node(ActorRef dispatcher){
+    public Node(ActorRef aggregator, ActorRef dispatcher){
+        this.aggregator = aggregator;
         this.dispatcher = dispatcher;
         standardSetting();
-
-        //long waitTime = Math.round(Math.random() * 10 * 100000);
-        //getContext().system().scheduler().scheduleOnce(Duration.create(waitTime,MILLISECONDS),dispatcher,new Self(),getContext().dispatcher(),self());
         dispatcher.tell(new Self(),self());
-        getContext().watch(dispatcher);
-        getContext().become(active, true);
     }
 
     private void standardSetting(){
         iteration = 0;
-
         r_received = 0;
         a_received = 0;
-
         row_infinity = 0;
         col_infinity = 0;
         sendOptimize = true;
         optimize = true;
     }
 
-    private void sendIdentifyRequest() {
-        getContext().actorSelection(path).tell(new Identify(path), self());
-        getContext().system().scheduler()
-                .scheduleOnce(Duration.create(3, SECONDS), self(), ReceiveTimeout.getInstance(), getContext().dispatcher(), self());
-    }
-
-    @Override public Receive createReceive() {
-        return waiting;
-    }
-
     @Override public void postStop() {getContext().system().terminate();}
 
-    private final Receive active = receiveBuilder()
-            // Messaggio di init
-            .match(Initialize.class, init -> {
-                this.s_col = init.similarity_col;
-                this.s_row = init.similarity_row;
-                this.self = init.selfID;
-            })
+    @Override public Receive createReceive() {
+        return receiveBuilder()
+                // Messaggio di init
+                .match(Initialize.class, init -> {
+                    this.s_col = init.similarity_col;
+                    this.s_row = init.similarity_row;
+                    this.self = init.selfID;
+                })
 
-            //Messaggio di pre-start
-            .match(Neighbors.class, neighbors1 -> {
-                this.neighbors = neighbors1.array;
-                this.size = neighbors1.size;
-                this.aggregator = neighbors1.aggregator;
+                //Messaggio di pre-start
+                .match(Neighbors.class, neighbors1 -> {
+                    this.neighbors = neighbors1.array;
+                    this.size = neighbors1.size;
 
-                //To begin the availabilities are initialized to 0
-                a_row = new double[size];
-                //In the first iteration is set to s_col[i] - max{s_col[j]} j != i
-                r_col = new double[size];
+                    //To begin the availabilities are initialized to 0
+                    a_row = new double[size];
+                    //In the first iteration is set to s_col[i] - max{s_col[j]} j != i
+                    r_col = new double[size];
 
-                if(optimize) {
-                    // -/> : not send to
-                    // i -/> k responsibility if s(i,k) = -INF
+                    if (optimize) {
+                        // -/> : not send to
+                        // i -/> k responsibility if s(i,k) = -INF
                         //r(i,k) = -INF
-                    // i -/> k availability if s(k,i) = -INF
+                        // i -/> k availability if s(k,i) = -INF
                         //a(i,k) != -INF
                         //but is not influential for k when he compute r(k,j) = s(k,j) - max{a(k,i) + -INF}
-                    for (int i = 0; i < size; i++) {
-                        if (Util.isMinDouble(s_col[i])){ //The node which cannot reach me
-                            col_infinity++;
-                            r_col[i] = Util.min_double; // r initialize
-                            // i will not receive message from node which have s[k][i] = -INF
+                        for (int i = 0; i < size; i++) {
+                            if (Util.isMinDouble(s_col[i])) { //The node which cannot reach me
+                                col_infinity++;
+                                r_col[i] = Util.min_double; // r initialize
+                                // i will not receive message from node which have s[k][i] = -INF
+                            }
+                            if (Util.isMinDouble(s_row[i])) { //The node i cannot reach
+                                row_infinity++;
+                                // a initialize : no need to do. is 0 to default
+                            }
                         }
-                        if(Util.isMinDouble(s_row[i])){ //The node i cannot reach
-                            row_infinity++;
-                            // a initialize : no need to do. is 0 to default
+
+                        r_not_infinite_neighbors = new ActorRef[size - row_infinity];
+                        a_not_infinite_neighbors = new ActorRef[size - col_infinity];
+                        r_reference = new int[size - row_infinity];
+                        a_reference = new int[size - col_infinity];
+
+                        int j = 0, k = 0;
+                        for (int i = 0; i < size; i++) {
+                            if (!Util.isMinDouble(s_row[i])) {
+                                r_not_infinite_neighbors[j] = neighbors[i];
+                                r_reference[j] = i;
+                                j++;
+                            }
+                            if (!Util.isMinDouble(s_col[i])) {
+                                a_not_infinite_neighbors[k] = neighbors[i];
+                                a_reference[k] = i;
+                                k++;
+                            }
                         }
+                        //assert(j == r_reference.length);
+                        //assert(j + row_infinity == size);
                     }
 
-                    r_not_infinite_neighbors = new ActorRef[size - row_infinity];
-                    a_not_infinite_neighbors = new ActorRef[size - col_infinity];
-                    r_reference = new int[size - row_infinity];
-                    a_reference = new int[size - col_infinity];
+                    dispatcher.tell(new Ready(), self());
+                })
 
-                    int j = 0, k = 0;
-                    for (int i = 0; i < size; i++) {
-                        if (! Util.isMinDouble(s_row[i])) {
-                            r_not_infinite_neighbors[j] = neighbors[i];
-                            r_reference[j] = i;
-                            j++;
-                        }
-                        if(! Util.isMinDouble(s_col[i])) {
-                            a_not_infinite_neighbors[k] = neighbors[i];
-                            a_reference[k] = i;
-                            k++;
-                        }
-                    }
-                    //assert(j == r_reference.length);
-                    //assert(j + row_infinity == size);
-                }
-
-                dispatcher.tell(new Ready(),self());
-            })
-
-            // Messaggio di start
-            .match(Start.class, msg -> {
-                //System.out.println(self + " started!");
-                sendResponsibility();
-            })
-
-            .match(Responsibility.class, responsibility -> {
-                r_col[responsibility.sender] = (r_col[responsibility.sender] * Constant.lambda) + (responsibility.value * (1 - Constant.lambda));
-                r_received++;
-
-                if (r_received == size - col_infinity) {
-                    r_received = 0;
-
-                    sendAvailability();
-                }
-            })
-
-            .match(Availability.class, availability -> {
-                a_row[availability.sender] = (a_row[availability.sender] * Constant.lambda) + (availability.value * (1 - Constant.lambda));
-                a_received++;
-
-                if (a_received == size - row_infinity) {
-                    a_received = 0;
-
-                    //Iteration's end
-                    if (this.iteration % (Constant.sendEach) == (Constant.sendEach - 1))
-                        aggregator.tell(new Value(r_col[self] + a_row[self], self, iteration), self());
-
-                    if(self == 0)System.out.println("Iterazione " + iteration + " completata!");
+                // Messaggio di start
+                .match(Start.class, msg -> {
+                    //System.out.println(self + " started!");
                     sendResponsibility();
+                })
 
-                    this.iteration++;
-                }
-            })
+                .match(Responsibility.class, responsibility -> {
+                    r_col[responsibility.sender] = (r_col[responsibility.sender] * Constant.lambda) + (responsibility.value * (1 - Constant.lambda));
+                    r_received++;
 
-            .match(Die.class, msg -> System.out.println("Not usefull actor..."))
-            .match(ReceiveTimeout.class, x -> { /*ignore*/ })
-            .build();
+                    if (r_received == size - col_infinity) {
+                        r_received = 0;
 
-    private final Receive waiting = receiveBuilder()
-            .match(ActorIdentity.class, identity -> {
-                Optional<ActorRef> maybe_actor = identity.getActorRef();
-                if (! maybe_actor.isPresent()) {
-                    System.out.println("Remote actor not available: " + path);
-                } else {
-                    dispatcher = maybe_actor.get();
-                    dispatcher.tell(new Self(),self());
-                    getContext().watch(dispatcher);
-                    getContext().become(active, true);
-                    System.out.println("Remote actor available: " + path);
-                }
-            })
-            .match(ReceiveTimeout.class, msg -> sendIdentifyRequest())
-            .build();
+                        sendAvailability();
+                    }
+                })
 
+                .match(Availability.class, availability -> {
+                    a_row[availability.sender] = (a_row[availability.sender] * Constant.lambda) + (availability.value * (1 - Constant.lambda));
+                    a_received++;
+
+                    if (a_received == size - row_infinity) {
+                        a_received = 0;
+
+                        //Iteration's end
+                        if (this.iteration % (Constant.sendEach) == (Constant.sendEach - 1))
+                            aggregator.tell(new Value(r_col[self] + a_row[self], self, iteration), self());
+
+                        if (self == 0) System.out.println("Iterazione " + iteration + " completata!");
+                        sendResponsibility();
+
+                        this.iteration++;
+                    }
+                })
+
+                .match(Die.class, msg -> System.out.println("Not usefull actor..."))
+                .build();
+    }
 
     private void sendResponsibility(){
         ActorRef[] sendVector;

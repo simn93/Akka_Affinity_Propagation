@@ -1,13 +1,16 @@
 import akka.actor.ActorRef;
 
 /**
- * Created by Simo on 05/06/2017.
+ * Class for collecting exchanged messages
+ *
+ * @author Simone Schirinzi
  */
-
-@SuppressWarnings("DefaultFileTemplate")
 interface Messages {
 }
 
+/**
+ * Responsibility
+ */
 class Responsibility implements Messages {
     public final double value;
     public final int sender;
@@ -18,6 +21,9 @@ class Responsibility implements Messages {
     }
 }
 
+/**
+ * Availability
+ */
 class Availability implements Messages {
     public final double value;
     public final int sender;
@@ -28,18 +34,24 @@ class Availability implements Messages {
     }
 }
 
+/**
+ * Neighbors class
+ * Provides information on links to cluster nodes
+ */
 class Neighbors implements Messages {
     public final ActorRef[] array;
     public final int size;
-    public final ActorRef aggregator;
 
-    public Neighbors(ActorRef[] array, int size, ActorRef aggregator){
+    public Neighbors(ActorRef[] array, int size){
         this.array = array;
         this.size = size;
-        this.aggregator = aggregator;
     }
 }
 
+/**
+ * Initialize class
+ * Provides information about the identity that the node will have to assume
+ */
 class Initialize implements Messages {
     public final double[] similarity_row;
     public final double[] similarity_col;
@@ -52,6 +64,11 @@ class Initialize implements Messages {
     }
 }
 
+/**
+ * Value for cluster's creation
+ * It's send from nodes to aggregator.
+ * Defines which iteration is related
+ */
 class Value implements Messages {
     public final Double value;
     public final int sender;
@@ -64,18 +81,32 @@ class Value implements Messages {
     }
 }
 
+/**
+ * Node hello message for the dispatcher
+ */
 class Self implements Messages {
 
 }
 
+/**
+ * Error dispatcher message for node: too many nodes were created.
+ */
 class Die implements Messages{
 
 }
 
+/**
+ * Start Message for Nodes: All nodes have completed initialization operations.
+ * The algorithm can begin.
+ */
 class Start implements Messages {
 
 }
 
+/**
+ * Message from the node to the dispatcher:
+ * Report that the node has completed initialization operations
+ */
 class Ready implements Messages {
 
 }

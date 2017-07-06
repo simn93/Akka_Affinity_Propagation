@@ -1,13 +1,31 @@
 /**
- * Created by Simone on 03/07/2017.
+ * Constant class
+ *
+ * @author Simone Schirinzi
  */
-@SuppressWarnings("DefaultFileTemplate")
+
 class Constant {
-    // Numero di iterazioni in cui il risultato deve essere stabile per poter terminare l'algoritmo
-    public static final long enoughIterations = 50;
-    // Ogni quante iterazioni i nodi devono inviare i risultati all'aggregator
+    /**
+     * Number of iterations where the result must be stable to finish the algorithm
+     */
+    public static final long enoughIterations = 25;
+
+    /**
+     * Each number of iterations the nodes must send the results to the aggregator
+     */
     public static final int sendEach = 1;
 
+    /**
+     * Each message is set to lambda time its value from the previous iteration
+     * plus 1 - lambda times its prescribed updated value.
+     * 0 <= lambda <= 1
+     * Default: 0.5
+     */
     public static final double lambda = 0.8;
+
+    /**
+     * To avoid oscillations in case of similar similarities,
+     * a random value is added to the input values.
+     */
     public static final double sigma = 0;
 }

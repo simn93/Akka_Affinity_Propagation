@@ -7,49 +7,131 @@ import java.util.ArrayList;
 import java.util.HashMap;
 
 /**
- * Created by Simo on 05/06/2017.
+ * Class for cluster computing
+ *
+ * @author Simone Schirinzi
  */
-@SuppressWarnings("DefaultFileTemplate")
 class Aggregator extends AbstractActor {
+    /**
+     * Similarity matrix
+     */
     private final double[][] similarity;
-    @SuppressWarnings("CanBeFinal")
+
+    /**
+     * number of nodes
+     */
     private int size;
 
+    /**
+     * Record of received values
+     * It only contains those received for which
+     * the cluster has not yet been calculated
+     */
     private final HashMap<Long,double[]> values;
+
+    /**
+     * Reference to the last cluster calculated
+     * other than the ones previously calculated.
+     * Useful to check if a new cluster emerged.
+     */
     private int[] previousCluster;
+
+    /**
+     * Indicates which iteration refers to the cluster
+     * stored in the variable previousCluster.
+     */
     private long previousClusterIteration;
 
+    /**
+     * Reference list of nodes.
+     * It is used at termination of the algorithm.
+     * It is used to send all the nodes
+     * at the same time a termination message.
+     */
     private ArrayList<ActorRef> nodes;
 
-    @SuppressWarnings("CanBeFinal")
+    /**
+     * if true : print all cluster
+     */
+    private final boolean verbose = false;
+
+    /**
+     * if true : show visual graph
+     */
+    private final boolean showGraph = false;
+
+    /**
+     * Timer for time control.
+     */
     private Timer timer;
+
+    /**
+     * Akka logger
+     * Logging in Akka is not tied to a specific logging backend.
+     * By default log messages are printed to STDOUT,
+     * but you can plug-in a SLF4J logger or your own logger.
+     * Logging is performed asynchronously
+     * to ensure that logging has minimal performance impact.
+     * Logging generally means IO and locks,
+     * which can slow down the operations of your code if it was performed synchronously.
+     */
     private final LoggingAdapter log = Logging.getLogger(getContext().getSystem(), this);
 
     static Props props(double[][] similarity, int size) {
         return Props.create(Aggregator.class, () -> new Aggregator(similarity,size));
     }
 
+    /**
+     * Create the class
+     *
+     * Start the timer
+     *
+     * @param similarity graph
+     * @param size of nodes
+     */
     private Aggregator(double[][] similarity, int size){
         this.similarity = similarity;
         this.size = size;
         this.values = new HashMap<>();
 
         timer = new Timer();
-        timer.Start();
+        timer.start();
     }
 
+    /**
+     * Get a value from a given node in reference to a certain iteration.
+     * {value, iteration, senderID} -> values[iteration][senderID] = value.
+     *
+     * values[iteration] is a size+1 sized vector :
+     * values[iteration][size] contains The number of values received by the nodes for that iteration
+     *
+     * Once I get values from all nodes for a given iteration I can calculate the cluster.
+     * Value = a(i,i) + r(i,i) for node i.
+     * value greater then 0 identify node i as an exemplar
+     *
+     * The message passing procedure may be terminated
+     * after the local decisions stay constant
+     * for some number of iterations
+     *
+     * @see Value
+     * @return receive handler
+     */
     @Override
     public Receive createReceive() {
         return receiveBuilder()
         .match(Value.class, value -> {
+            /* HashMap vector creation */
             if(! values.containsKey(value.iteration))
                 values.put(value.iteration,new double[size+1]);
 
-            //current[size] = numero di valori ricevuti dai nodi per quell'iterazione
+            /* save the value into the vector refereed to iteration value */
             double[] current = values.get(value.iteration);
             current[value.sender] = value.value;
+
+            /* increase the number of value received refereed to iteration value */
             current[size] += 1;
 
+            /* can compute the cluster */
             if(current[size] == size){
                 ArrayList<Integer> exemplars = new ArrayList<>();
                 for(int i = 0; i < size; i++)
@@ -59,10 +141,8 @@ class Aggregator extends AbstractActor {
                 int[] e = new int[exemplars.size()];
                 for(int i= 0; i < exemplars.size(); i++) e[i] = exemplars.get(i);
 
-                //se il cluster non cambia per k volte
-                if(!isChanged(buildCluster(e),value.iteration) &&
+                if(!isChanged(buildCluster(e,verbose,showGraph), value.iteration) &&
                         value.iteration - previousClusterIteration > Constant.enoughIterations){
-                    //termino tutto
                     getContext().become(killMode,true);
                 }
                 values.remove(value.iteration);
@@ -71,6 +151,20 @@ class Aggregator extends AbstractActor {
         .build();
     }
 
+    /**
+     * Receiving active handler at system termination.
+     * It tracks the nodes from which it receives requests
+     * in a specially crafted vector.
+     * Once he get references to all active nodes,
+     * send them a poisoned message so they can terminate them.
+     *
+     * Akka poisonPill
+     * To kill an actor You can also send the akka.actor.PoisonPill message,
+     * which will stop the actor when the message is processed.
+     * PoisonPill is enqueued as ordinary messages
+     * and will be handled after messages
+     * that were already queued in the mailbox.
+     */
     private final Receive killMode = receiveBuilder()
             .match(Value.class, msg -> {
                 if(nodes == null) nodes = new ArrayList<>();
@@ -79,16 +173,25 @@ class Aggregator extends AbstractActor {
                     for(ActorRef actorRef : nodes)
                         actorRef.tell(akka.actor.PoisonPill.getInstance(),ActorRef.noSender());
 
-                    timer.Stop();
+                    timer.stop();
                     log.info("Job done U_U after " + previousClusterIteration + " iterations and " + timer);
                     context().system().terminate();
                 }
             })
             .build();
 
-    private int[] buildCluster(int[] exemplars){
+    /**
+     * Creating the cluster
+     *
+     * It is said that a node "n" belongs to a cluster with reference to an exemplar "e"
+     * if forall of the other exemplars emerged "o" : s(n,e) > s(n,o)
+     *
+     * @param exemplars vector
+     * @return cluster : i belong to cluster[i]
+     */
+    private int[] buildCluster(int[] exemplars, boolean verbose, boolean showGraph){
         int[] cluster = new int[size];
-        //Creazione del cluster
+
         for (int i = 0; i < size; i++) {
             Double max = Util.min_double;
             int index = -1;
@@ -101,22 +204,33 @@ class Aggregator extends AbstractActor {
             cluster[i] = index;
         }
 
-        //for (int i = 0; i < size; i++)
-            //log.info(i + " belong to " + cluster[i]);
+        if(verbose)
+            for (int i = 0; i < size; i++)
+                log.info(i + " belong to " + cluster[i]);
 
-        //(new VisualGraph(exemplars,cluster)).show(800,800);
+        if(showGraph) (new VisualGraph(exemplars,cluster)).show(800,800);
         return cluster;
     }
 
+    /**
+     * Checks if the calculated cluster is different from the last different calculated previously
+     * @param cluster to check if is changed
+     * @param iteration to which it refers
+     * @return  True if cluster != previous cluster
+     *          False if cluster == previous cluster
+     */
     private boolean isChanged(int[] cluster, long iteration){
-        //Se non esiste : prima iterazione
+        /* I'm calculating a cluster for an old iteration */
+        if(previousClusterIteration > iteration) return false;
+
+        /* Computing the first cluster */
         if(previousCluster == null){
             previousCluster = cluster;
             previousClusterIteration = iteration;
             return true;
         }
 
-        //Se c'è qualche differenza dal precedente
+        /* Is changed */
         for(int i = 0; i < size; i++){
             if(previousCluster[i] != cluster[i]){
                 previousCluster = cluster;
@@ -125,7 +239,7 @@ class Aggregator extends AbstractActor {
             }
         }
 
-        //Se non è cambiato
+        /* Is not changed */
         return false;
     }
 }
