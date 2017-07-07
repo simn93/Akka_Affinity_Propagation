@@ -20,6 +20,7 @@ class Aggregator extends AbstractActor {
     /**
      * number of nodes
      */
+    @SuppressWarnings("CanBeFinal")
     private int size;
 
     /**
@@ -63,6 +64,7 @@ class Aggregator extends AbstractActor {
     /**
      * Timer for time control.
      */
+    @SuppressWarnings("CanBeFinal")
     private Timer timer;
 
     /**
@@ -100,7 +102,7 @@ class Aggregator extends AbstractActor {
 
     /**
      * Get a value from a given node in reference to a certain iteration.
-     * {value, iteration, senderID} -> values[iteration][senderID] = value.
+     * {value, iteration, senderID} : values[iteration][senderID] = value.
      *
      * values[iteration] is a size+1 sized vector :
      * values[iteration][size] contains The number of values received by the nodes for that iteration
@@ -184,9 +186,11 @@ class Aggregator extends AbstractActor {
      * Creating the cluster
      *
      * It is said that a node "n" belongs to a cluster with reference to an exemplar "e"
-     * if forall of the other exemplars emerged "o" : s(n,e) > s(n,o)
+     * if forall of the other exemplars emerged "o" : s(n,e) greater than s(n,o)
      *
      * @param exemplars vector
+     * @param verbose if True : print all cluster
+     * @param showGraph if True : show visual graph
      * @return cluster : i belong to cluster[i]
      */
     private int[] buildCluster(int[] exemplars, boolean verbose, boolean showGraph){

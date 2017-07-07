@@ -50,6 +50,7 @@ class VisualGraph extends JFrame {
      * @param width of the window
      * @param height of the window
      */
+    @SuppressWarnings("SameParameterValue")
     public void show(int width, int height){
         this.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
         this.setSize(width, height);
@@ -57,7 +58,13 @@ class VisualGraph extends JFrame {
     }
 
     /**
-     *  Check if j is an exemplar */
+     *  Check if j is an exemplar
+     *
+     *  @param j index of maybe exemplar
+     *  @param exemplars vector of current exemplar
+     *
+     *  @return true if j is in exemplars
+     */
     private boolean isExemplar(int j, int[] exemplars){
         for(int i : exemplars) if(i==j) return true;
         return false;

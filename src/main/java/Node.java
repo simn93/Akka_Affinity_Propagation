@@ -14,6 +14,7 @@ class Node extends AbstractActor{
      * Received when creating the node.
      * A newly created node sends a self () message
      */
+    @SuppressWarnings("CanBeFinal")
     private ActorRef dispatcher;
 
     /**
@@ -21,6 +22,7 @@ class Node extends AbstractActor{
      * Received when creating the node.
      * Each node periodically sends a Value () message to check the algorithm's performance.
      */
+    @SuppressWarnings("CanBeFinal")
     private ActorRef aggregator;
 
     //------------------
@@ -159,9 +161,11 @@ class Node extends AbstractActor{
     private int[] a_reference;
 
     /**
-     *
-     * @param aggregator
-     * @param dispatcher
+     * Create a node
+     * Initializes iteration variables
+     * Send a hello message to the dispatcher
+     * @param aggregator link to aggregator
+     * @param dispatcher link to dispatcher
      */
     public Node(ActorRef aggregator, ActorRef dispatcher){
         this.aggregator = aggregator;
@@ -170,6 +174,10 @@ class Node extends AbstractActor{
         dispatcher.tell(new Self(),self());
     }
 
+    /**
+     * Initializes iteration variables.
+     * Enables both optimization flags
+     */
     private void standardSetting(){
         iteration = 0;
         r_received = 0;
@@ -180,58 +188,99 @@ class Node extends AbstractActor{
         optimize = true;
     }
 
+    /**
+     * The termination phase is started by the aggregator.
+     * It sends a poison pill to the node.
+     * Akka lets you run a last function on the node.
+     * This also ends the systems connected to the nodes.
+     */
     @Override public void postStop() {getContext().system().terminate();}
 
+    /**
+     * Receive builder
+     * @return Node message manager
+     * @see Initialize
+     * @see Neighbors
+     * @see Start
+     * @see Die
+     * @see Responsibility
+     * @see Availability
+     */
     @Override public Receive createReceive() {
         return receiveBuilder()
-                .match(Initialize.class, this::initializeHandler) // Messaggio di init
-                .match(Neighbors.class, this::neighborsHandler) //Messaggio di pre-start
-                .match(Start.class, this::sendResponsibility) // Messaggio di start
-                .match(Die.class, this::dieHandler) //Not useful actor
+                .match(Initialize.class, this::initializeHandler)
+                .match(Neighbors.class, this::neighborsHandler)
+                .match(Die.class, this::dieHandler)
+                .match(Start.class, msg -> sendResponsibility())
                 .match(Responsibility.class, this::responsibilityHandler)
                 .match(Availability.class, this::availabilityHandler)
                 .build();
     }
 
+    /**
+     * Handler for the initialization message
+     * @param init received message
+     */
     private void initializeHandler(Initialize init){
         this.s_col = init.similarity_col;
         this.s_row = init.similarity_row;
         this.self = init.selfID;
     }
 
+    /**
+     * Handler for neighbors message
+     *
+     * If optimize is True:
+     * let -/&gt; : not send to
+     *
+     * i -/&gt; k responsibility if s(i,k) = -INF
+     * r(i,k) = -INF
+     * i -/&gt; k availability if s(k,i) = -INF
+     * a(i,k) != -INF
+     * but is not influential for k
+     * when he compute r(k,j) = s(k,j) - max{a(k,i) + -INF}
+     *
+     * col_infinity : The node which cannot reach me
+     * row_infinity : The node i cannot reach
+     *
+     * if s_col[i] is infinity
+     * r_col[i] must be set to infinity
+     *
+     * In addition, the carriers of links to infinite nodes are initialized
+     *
+     * When finished all operations
+     * send a Ready() message to the dispatcher.
+     * The node thus remains awaiting a Start() message
+     *
+     * @param neigh received message
+     */
     private void neighborsHandler(Neighbors neigh){
         this.neighbors = neigh.array;
         this.size = neigh.size;
-
-        //To begin the availabilities are initialized to 0
         a_row = new double[size];
-        //In the first iteration is set to s_col[i] - max{s_col[j]} j != i
         r_col = new double[size];
 
         if (optimize) {
-            // -/> : not send to
-            // i -/> k responsibility if s(i,k) = -INF
-            //r(i,k) = -INF
-            // i -/> k availability if s(k,i) = -INF
-            //a(i,k) != -INF
-            //but is not influential for k when he compute r(k,j) = s(k,j) - max{a(k,i) + -INF}
             for (int i = 0; i < size; i++) {
-                if (Util.isMinDouble(s_col[i])) { //The node which cannot reach me
+                if (Util.isMinDouble(s_col[i])) {
                     col_infinity++;
-                    r_col[i] = Util.min_double; // r initialize
-                    // i will not receive message from node which have s[k][i] = -INF
+
+                    /* r initialize */
+                    r_col[i] = Util.min_double;
                 }
-                if (Util.isMinDouble(s_row[i])) { //The node i cannot reach
-                    row_infinity++;
-                    // a initialize : no need to do. is 0 to default
-                }
+                if (Util.isMinDouble(s_row[i])) row_infinity++;
             }
 
+            /* size - row_infinite nodes must receive responsibility message */
             r_not_infinite_neighbors = new ActorRef[size - row_infinity];
+
+            /* size - col_infinite nodes must receive availability message */
             a_not_infinite_neighbors = new ActorRef[size - col_infinity];
+
             r_reference = new int[size - row_infinity];
             a_reference = new int[size - col_infinity];
 
+            /* Vector are set */
             int j = 0, k = 0;
             for (int i = 0; i < size; i++) {
                 if (!Util.isMinDouble(s_row[i])) {
@@ -249,13 +298,31 @@ class Node extends AbstractActor{
             //assert(j + row_infinity == size);
         }
 
+        /* node are ready to start */
         dispatcher.tell(new Ready(), self());
     }
 
+    /**
+     * If more nodes are created than necessary,
+     * the dispatcher sends a message to the node.
+     * The node is useless for computing purposes.
+     *
+     * @param msg received
+     */
     private void dieHandler(Die msg){
-        System.out.println("Not usefull actor...");
+        System.out.println(msg + " Not useful actor...");
     }
 
+    /**
+     * Receive the message.
+     * Refresh the saved value by damping it with a lambda factor.
+     *
+     * Increments the responsibility counter received,
+     * and possibly submits the availability
+     *
+     * @param responsibility received
+     * @see Responsibility
+     */
     private void responsibilityHandler(Responsibility responsibility){
         r_col[responsibility.sender] = (r_col[responsibility.sender] * Constant.lambda) + (responsibility.value * (1 - Constant.lambda));
         r_received++;
@@ -267,6 +334,22 @@ class Node extends AbstractActor{
         }
     }
 
+    /**
+     * Receive the message.
+     * Refresh the saved value by damping it with a lambda factor.
+     *
+     * Increments the availability counter received,
+     * and possibly submits the responsibility
+     *
+     * It also undertakes to send a Value() message to the aggregator.
+     * This value is calculated
+     * as the sum of self-responsibility and self-availability.
+     *
+     * Increase iteration counter
+     *
+     * @param availability received
+     * @see Availability
+     */
     private void availabilityHandler(Availability availability){
         a_row[availability.sender] = (a_row[availability.sender] * Constant.lambda) + (availability.value * (1 - Constant.lambda));
         a_received++;
@@ -274,18 +357,39 @@ class Node extends AbstractActor{
         if (a_received == size - row_infinity) {
             a_received = 0;
 
-            //Iteration's end
+            /* End of an iteration. Check whether or not to send an update. */
             if (this.iteration % (Constant.sendEach) == (Constant.sendEach - 1))
                 aggregator.tell(new Value(r_col[self] + a_row[self], self, iteration), self());
 
-            if (self == 0) System.out.println("Iterazione " + iteration + " completata!");
+            if (self == 0) System.out.println("Iteration " + iteration + " completed!");
             sendResponsibility();
 
             this.iteration++;
         }
     }
 
-    private void sendResponsibility(Object ignore){sendResponsibility();}
+    /**
+     * Send responsibility to other node
+     *
+     * If it optimizes the sending of messages,
+     * it only sends to r_not_infinite_neighbors.
+     * Otherwise he sends it to neighbors.
+     *
+     * If it optimizes the responsibility calculation,
+     * it pre-calculates the maximum
+     * of the set {a_row [i] + s_row [i]},
+     * possibly iterating only on such nodes
+     * that s_row [i] is not infinite.
+     * Keeps Memory The first bigger value,
+     * the index of the node to which it refers, is k,
+     * and the second largest value.
+     * The calculation of the responsibility is obtained
+     * by subtracting the maximum from s_row[j],
+     * except if k == j. In this case
+     * the second maximum is subtracted.
+     *
+     * @see Responsibility
+     */
     private void sendResponsibility(){
         ActorRef[] sendVector;
         int[] sendIndex;
@@ -319,10 +423,7 @@ class Node extends AbstractActor{
 
             for(int i = 0; i < sendSize; i++)
                 sendValue[i] = r(sendIndex[i],firstK,firstMax,secondMax);
-                //String debug = "";
-                //for(int j = 0; j < size; j++) if(!Util.isMinDouble(a_row[j]+s_row[j])) debug+=a_row[j]+s_row[j]+" ";
-                //assert (sendValue[i] == r(sendIndex[i])) : sendValue[i] + " " + r(sendIndex[i]) + " " +firstK + " " + firstMax + " " + secondMax + " " + debug;
-                //assert (r(sendIndex[i]) == r(r_reference[i]));
+                //assert (sendValue[i] == r(sendIndex[i]));
         } else
             for(int i = 0; i < sendSize; i++)
                 sendValue[i] = r(sendIndex[i]);
@@ -333,6 +434,23 @@ class Node extends AbstractActor{
             //assert (sendVector[i].compareTo(r_not_infinite_neighbors[i]) == 0);
     }
 
+    /**
+     * Send Availability to other node
+     *
+     * If it optimizes the sending of messages,
+     * it only sends to a_not_infinite_neighbors.
+     * Otherwise he sends it to neighbors.
+     *
+     * If it optimizes the responsibility calculation,
+     * it undertakes to pre-compute
+     * the sum of the positive values
+     * of the set {r_col [i]},
+     * possibly iterating only on such nodes
+     * that s_col[i] is not infinite.
+     * The calculation of availability is obtained
+     * by subtracting r_col[j] from that sum
+     * only if r_col[j] is positive.
+     */
     private void sendAvailability(){
         ActorRef[] sendVector;
         int[] sendIndex;
@@ -374,35 +492,94 @@ class Node extends AbstractActor{
             sendVector[i].tell(new Availability(sendValue[i], self), self());
     }
 
+    /**
+     * Compute r(i,k).
+     * Responsibility r(i,k) sent from node i candidate exemplar k
+     * reflects the accumulated evidence for how well-suited
+     * point k is to serve as exemplar for point i
+     *
+     * r(i,k) = s(i,k) - max, k' s.t. k' != k, {a(i,k')+s(i,k')}
+     * @param k index of node which send r(i,k)
+     * @return r(i,k)
+     */
     private double r(int k){
         double max = Util.min_double;
-        // foreach except k
+        /* foreach except k */
+        /* pre condition : max = -INF */
         for (int i = 0; i < k; i++)
             max = (max > (a_row[i] + s_row[i])) ? max : (a_row[i] + s_row[i]);//Math.max(max, a_row[i] + s_row[i]);
         for (int i = k + 1; i < size; i++)
             max = (max > (a_row[i] + s_row[i])) ? max : (a_row[i] + s_row[i]);//Math.max(max, a_row[i] + s_row[i]);
+        /* post condition : max = maximum, k' != k, 0 <= k' <= size,
+        { a(i,k') + s(i,k') } */
 
         return s_row[k] - max;
     }
 
+    /**
+     * Compute r(i,k) in an optimized way.
+     * @param k index of node which send r(i,k)
+     * @param firstK max of {a(i,j)+s(i,j)}
+     * @param firstMax index q such that firstK == a(i,q)+s(i,q)
+     * @param secondMax max of {a(i,j)+s(i,j), j!=firstMax }
+     * @return r(i,k)
+     */
     private double r(int k, int firstK, double firstMax, double secondMax){
         return (k == firstK ? s_row[k] - secondMax : s_row[k] - firstMax);
     }
 
+    /**
+     * Compute a(i,k).
+     * Availability a(i,k), sent from candidate exemplar point k
+     * to point i, reflects the accumulated evidence for
+     * how appropriate it would be for point i to choose
+     * point k as its exemplars
+     *
+     * a(i,k) = min{0, r(k,k)+ Σ, i' s.t. i' != i &amp;&amp; i' != k, (max{0,r(i',k)})}
+     *
+     * @param i index of node which send a(i,k)
+     * @return a(i,k)
+     */
     private double a(int i){
         double ret = r_col[self];
+
+        /* pre condition : ret = r(k,k) */
         for(int q = 0; q < size; q++)
             if(q != i && q != self && r_col[q] > 0.0)
                 ret += r_col[q];
+        /* post condition : ret = r(k,k) + Σ r(q,k) ,
+         * s.t. q != i && q != self && r[q][i]) > 0.0
+         */
 
-        return 0 < ret ? 0 : ret;//Math.min(0,ret);
+        /* return min { 0 , ret } */
+        return 0 < ret ? 0 : ret;
     }
 
+    /**
+     * Compute r(i,k) in an optimized way
+     * @param i index of the node which send a(i,k)
+     * @param sum r(k,k) + Σ max{0,r(i,q)} s.t. q != self
+     * @return a(i,k)
+     */
     private double a(int i, double sum){
+        /* We added too much.
+         * To get the correct result
+         * you have to subtract the possible member too.
+         */
         if(r_col[i] > 0.0) sum -= r_col[i];
+
+        /* return min { 0 , ret } */
         return 0 < sum ? 0 : sum;
     }
 
+    /**
+     * Self availability is updated differently.
+     * This message reflects accumulated evidence that point k
+     * is an exemplar, based on the positive responsibilities
+     * sent to candidate exemplar k from other points
+     *
+     * @return a(k,k)
+     */
     private double a(){
         double ret = 0.0;
         for(int q = 0; q < size; q++)
@@ -412,6 +589,13 @@ class Node extends AbstractActor{
         return ret;
     }
 
+    /**
+     * Compute r(k,k) in an optimized way
+     * We don't need r(k,K) in "sum"
+     *
+     * @param sum r(k,k) + Σ max{0,r(i,q)} s.t. q != self
+     * @return r(k,k)
+     */
     private double a(double sum){
         return sum - r_col[self];
     }

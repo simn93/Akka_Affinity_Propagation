@@ -54,6 +54,7 @@ class Timer{
 
     /**
      * Get the time elapsed.
+     * @return string represent date
      * */
     private String getDate(){
 
@@ -67,8 +68,8 @@ class Timer{
         return fmt.print(p);
     }
 
-    /** @see this.getDate
-     *
+    /**
+     * @return string represent date
      */
     @Override
     public String toString(){

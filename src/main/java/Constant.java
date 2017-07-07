@@ -18,7 +18,7 @@ class Constant {
     /**
      * Each message is set to lambda time its value from the previous iteration
      * plus 1 - lambda times its prescribed updated value.
-     * 0 <= lambda <= 1
+     * 0 &lt;= lambda &lt;= 1
      * Default: 0.5
      */
     public static final double lambda = 0.8;
