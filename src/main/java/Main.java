@@ -51,7 +51,7 @@ public class Main {
         @SuppressWarnings("unused") String default_file = "./infinity_test.txt";
         if(args.length > 1) //noinspection UnusedAssignment
             default_file = args[1];
-        double[][] graph = Util.buildGraphRandom(3000);
+        double[][] graph = Util.buildGraph(default_file,"  ","",true,Constant.sigma);
         int size = graph.length;
 
         /* Address build */

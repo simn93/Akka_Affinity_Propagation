@@ -8,48 +8,161 @@ import java.util.stream.IntStream;
  */
 class Node extends AbstractActor{
     // Connection variable
+
+    /**
+     * Link to the actor responsible for initializing the nodes.
+     * Received when creating the node.
+     * A newly created node sends a self () message
+     */
     private ActorRef dispatcher;
+
+    /**
+     * Link to the actor responsible for generating the cluster.
+     * Received when creating the node.
+     * Each node periodically sends a Value () message to check the algorithm's performance.
+     */
     private ActorRef aggregator;
+
     //------------------
 
     // Received from Initialize
     //Similarity
+
+    /**
+     * Vector line of similarity of interest for the node.
+     * Received from the Initialize message.
+     */
     private double[] s_row;
+
+    /**
+     * Column vector of similarity of interest for the node.
+     * Received from the Initialize message.
+     */
     private double[] s_col;
+
     //Id of Actor
+
+    /**
+     * Node identifier
+     * Received from the Initialize message.
+     */
     private int self;
+
     //------------------
 
     // Received from Neighbors
+
+    /**
+     * Vector containing references to all actors in the cluster.
+     * Received from the Neighbors message.
+     */
     private ActorRef[] neighbors;
+
+    /**
+     * Indicates the number of nodes initiated by the algorithm.
+     * Received from the Neighbors message.
+     */
     private int size;
+
     //------------------
 
     // Iteration variable
-    // Iteration counter
+
+    /**
+     * Iteration variable.
+     * Indicates the current iteration number.
+     */
     private long iteration;
+
     // Memorization of value received
-    // x_col[q] = x[q][this]
+
+    /**
+     * Remembers the responsibilities received from other nodes.
+     * A node k receives r(i, k) from node i.
+     * R_col[i] = r[i][k]
+     */
     private double[] r_col;
-    // x_row[q] = x[this][q]
+
+    /**
+     * Remembers the availability received from other nodes.
+     * A node k receives a(k, i) from node i.
+     * A_row[i] = a[k][i]
+     */
     private double[] a_row;
+
     // Received values counter
+
+    /**
+     * Counter of Responsibility received from Other Nodes.
+     * It is initialized at 0 at the beginning of each iteration
+     */
     private int r_received;
+
+    /**
+     * Counter of Availability received from Other Nodes.
+     * It is initialized at 0 at the beginning of each iteration
+     */
     private int a_received;
+
     //------------------
 
     // Optimizations for less computation
+
+    /**
+     * Flags to enable some optimizations to reduce the complexity of the calculations
+     *
+     * In the calculation of responsibilities,
+     * it computes only one time
+     * the maximum of the set {a_row [i] + s_row [i]}
+     * and only between nodes with non infinite similarity
+     */
     private boolean sendOptimize;
+
     // Optimizations for less messages
+
+    /**
+     * Flags to enable some optimizations to reduce the number of exchanged node messages.
+     * Avoid sending messages to the nodes with which it has infinite similarity
+     */
     private boolean optimize;
-    //...
+
+    /**
+     * Denotes the number of nodes such that s_row[i] = -INF
+     */
     private int row_infinity;
+
+    /**
+     * Denotes the number of nodes such that s_col[i] = -INF
+     */
     private int col_infinity;
+
+    /**
+     * Vector of references to such actors that s_row [i]! = -INF
+     */
     private ActorRef[] r_not_infinite_neighbors;
+
+    /**
+     * Vector of references to such actors that s_col [i]! = -INF
+     */
     private ActorRef[] a_not_infinite_neighbors;
+
+    /**
+     * Vector of indexes of such actors that s_row [i]! = -INF
+     * r_not_infinite_neighbors[i].ID == r_reference[i]
+     */
     private int[] r_reference;
+
+    /**
+     * Vector of indexes of such actors that s_col [i]! = -INF
+     * a_not_infinite_neighbors[i].ID == a_reference[i]
+     */
     private int[] a_reference;
 
+    /**
+     *
+     * @param aggregator
+     * @param dispatcher
+     */
     public Node(ActorRef aggregator, ActorRef dispatcher){
         this.aggregator = aggregator;
         this.dispatcher = dispatcher;
@@ -71,106 +184,108 @@ class Node extends AbstractActor{
 
     @Override public Receive createReceive() {
         return receiveBuilder()
-                // Messaggio di init
-                .match(Initialize.class, init -> {
-                    this.s_col = init.similarity_col;
-                    this.s_row = init.similarity_row;
-                    this.self = init.selfID;
-                })
-
-                //Messaggio di pre-start
-                .match(Neighbors.class, neighbors1 -> {
-                    this.neighbors = neighbors1.array;
-                    this.size = neighbors1.size;
-
-                    //To begin the availabilities are initialized to 0
-                    a_row = new double[size];
-                    //In the first iteration is set to s_col[i] - max{s_col[j]} j != i
-                    r_col = new double[size];
-
-                    if (optimize) {
-                        // -/> : not send to
-                        // i -/> k responsibility if s(i,k) = -INF
-                        //r(i,k) = -INF
-                        // i -/> k availability if s(k,i) = -INF
-                        //a(i,k) != -INF
-                        //but is not influential for k when he compute r(k,j) = s(k,j) - max{a(k,i) + -INF}
-                        for (int i = 0; i < size; i++) {
-                            if (Util.isMinDouble(s_col[i])) { //The node which cannot reach me
-                                col_infinity++;
-                                r_col[i] = Util.min_double; // r initialize
-                                // i will not receive message from node which have s[k][i] = -INF
-                            }
-                            if (Util.isMinDouble(s_row[i])) { //The node i cannot reach
-                                row_infinity++;
-                                // a initialize : no need to do. is 0 to default
-                            }
-                        }
-
-                        r_not_infinite_neighbors = new ActorRef[size - row_infinity];
-                        a_not_infinite_neighbors = new ActorRef[size - col_infinity];
-                        r_reference = new int[size - row_infinity];
-                        a_reference = new int[size - col_infinity];
-
-                        int j = 0, k = 0;
-                        for (int i = 0; i < size; i++) {
-                            if (!Util.isMinDouble(s_row[i])) {
-                                r_not_infinite_neighbors[j] = neighbors[i];
-                                r_reference[j] = i;
-                                j++;
-                            }
-                            if (!Util.isMinDouble(s_col[i])) {
-                                a_not_infinite_neighbors[k] = neighbors[i];
-                                a_reference[k] = i;
-                                k++;
-                            }
-                        }
-                        //assert(j == r_reference.length);
-                        //assert(j + row_infinity == size);
-                    }
-
-                    dispatcher.tell(new Ready(), self());
-                })
-
-                // Messaggio di start
-                .match(Start.class, msg -> {
-                    //System.out.println(self + " started!");
-                    sendResponsibility();
-                })
-
-                .match(Responsibility.class, responsibility -> {
-                    r_col[responsibility.sender] = (r_col[responsibility.sender] * Constant.lambda) + (responsibility.value * (1 - Constant.lambda));
-                    r_received++;
-
-                    if (r_received == size - col_infinity) {
-                        r_received = 0;
-
-                        sendAvailability();
-                    }
-                })
-
-                .match(Availability.class, availability -> {
-                    a_row[availability.sender] = (a_row[availability.sender] * Constant.lambda) + (availability.value * (1 - Constant.lambda));
-                    a_received++;
-
-                    if (a_received == size - row_infinity) {
-                        a_received = 0;
-
-                        //Iteration's end
-                        if (this.iteration % (Constant.sendEach) == (Constant.sendEach - 1))
-                            aggregator.tell(new Value(r_col[self] + a_row[self], self, iteration), self());
-
-                        if (self == 0) System.out.println("Iterazione " + iteration + " completata!");
-                        sendResponsibility();
-
-                        this.iteration++;
-                    }
-                })
-
-                .match(Die.class, msg -> System.out.println("Not usefull actor..."))
+                .match(Initialize.class, this::initializeHandler) // Messaggio di init
+                .match(Neighbors.class, this::neighborsHandler) //Messaggio di pre-start
+                .match(Start.class, this::sendResponsibility) // Messaggio di start
+                .match(Die.class, this::dieHandler) //Not useful actor
+                .match(Responsibility.class, this::responsibilityHandler)
+                .match(Availability.class, this::availabilityHandler)
                 .build();
     }
 
+    private void initializeHandler(Initialize init){
+        this.s_col = init.similarity_col;
+        this.s_row = init.similarity_row;
+        this.self = init.selfID;
+    }
+
+    private void neighborsHandler(Neighbors neigh){
+        this.neighbors = neigh.array;
+        this.size = neigh.size;
+
+        //To begin the availabilities are initialized to 0
+        a_row = new double[size];
+        //In the first iteration is set to s_col[i] - max{s_col[j]} j != i
+        r_col = new double[size];
+
+        if (optimize) {
+            // -/> : not send to
+            // i -/> k responsibility if s(i,k) = -INF
+            //r(i,k) = -INF
+            // i -/> k availability if s(k,i) = -INF
+            //a(i,k) != -INF
+            //but is not influential for k when he compute r(k,j) = s(k,j) - max{a(k,i) + -INF}
+            for (int i = 0; i < size; i++) {
+                if (Util.isMinDouble(s_col[i])) { //The node which cannot reach me
+                    col_infinity++;
+                    r_col[i] = Util.min_double; // r initialize
+                    // i will not receive message from node which have s[k][i] = -INF
+                }
+                if (Util.isMinDouble(s_row[i])) { //The node i cannot reach
+                    row_infinity++;
+                    // a initialize : no need to do. is 0 to default
+                }
+            }
+
+            r_not_infinite_neighbors = new ActorRef[size - row_infinity];
+            a_not_infinite_neighbors = new ActorRef[size - col_infinity];
+            r_reference = new int[size - row_infinity];
+            a_reference = new int[size - col_infinity];
+
+            int j = 0, k = 0;
+            for (int i = 0; i < size; i++) {
+                if (!Util.isMinDouble(s_row[i])) {
+                    r_not_infinite_neighbors[j] = neighbors[i];
+                    r_reference[j] = i;
+                    j++;
+                }
+                if (!Util.isMinDouble(s_col[i])) {
+                    a_not_infinite_neighbors[k] = neighbors[i];
+                    a_reference[k] = i;
+                    k++;
+                }
+            }
+            //assert(j == r_reference.length);
+            //assert(j + row_infinity == size);
+        }
+
+        dispatcher.tell(new Ready(), self());
+    }
+
+    private void dieHandler(Die msg){
+        System.out.println("Not usefull actor...");
+    }
+
+    private void responsibilityHandler(Responsibility responsibility){
+        r_col[responsibility.sender] = (r_col[responsibility.sender] * Constant.lambda) + (responsibility.value * (1 - Constant.lambda));
+        r_received++;
+
+        if (r_received == size - col_infinity) {
+            r_received = 0;
+
+            sendAvailability();
+        }
+    }
+
+    private void availabilityHandler(Availability availability){
+        a_row[availability.sender] = (a_row[availability.sender] * Constant.lambda) + (availability.value * (1 - Constant.lambda));
+        a_received++;
+
+        if (a_received == size - row_infinity) {
+            a_received = 0;
+
+            //Iteration's end
+            if (this.iteration % (Constant.sendEach) == (Constant.sendEach - 1))
+                aggregator.tell(new Value(r_col[self] + a_row[self], self, iteration), self());
+
+            if (self == 0) System.out.println("Iterazione " + iteration + " completata!");
+            sendResponsibility();
+
+            this.iteration++;
+        }
+    }
+
+    private void sendResponsibility(Object ignore){sendResponsibility();}
     private void sendResponsibility(){
         ActorRef[] sendVector;
         int[] sendIndex;
@@ -193,7 +308,7 @@ class Node extends AbstractActor{
             int firstK = -1;
             firstMax = secondMax = Util.min_double;
 
-            for (int i = 0; i < size; i++) {
+            for (int i : sendIndex) {
                 double value = a_row[i] + s_row[i];
                 if (firstMax <= value) {
                     secondMax = firstMax;
@@ -237,7 +352,7 @@ class Node extends AbstractActor{
 
         if(sendOptimize){
             double sum = r_col[self];
-            for(int q = 0; q < size; q++)
+            for(int q : sendIndex)
                 if(q != self && r_col[q] > 0.0)
                     sum += r_col[q];
 
