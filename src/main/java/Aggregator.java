@@ -7,8 +7,7 @@ import java.io.BufferedReader;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.*;
 
 /**
  * Class for cluster computing
@@ -53,7 +52,18 @@ class Aggregator extends AbstractActor {
      * It is used to send all the nodes
      * at the same time a termination message.
      */
-    private ArrayList<ActorRef> nodes;
+    private ActorRef[] nodes;
+
+    /**
+     * Collection of similarity optimized.
+     * Each row contains the indexes of the nodes
+     * with which the row number index node has not infinite similarity.
+     * These indexes are sorted in descending order
+     * with respect to the similarity it has
+     * with the index number node of the row.
+     * Ex. M[3][0] = 2 <=> s(3,0) = max {s(3,i)} , 0 <= i < size
+     */
+    private int[][] compactSimilarity;
 
     /**
      * if true : print all cluster
@@ -98,9 +108,12 @@ class Aggregator extends AbstractActor {
         this.lineMatrix = lineMatrix;
         this.size = size;
         this.values = new HashMap<>();
+        this.compactSimilarity = new int[size][];
 
         timer = new Timer();
         timer.start();
+
+        buildSimilarity();
     }
 
     /**
@@ -117,6 +130,19 @@ class Aggregator extends AbstractActor {
      * The message passing procedure may be terminated
      * after the local decisions stay constant
      * for some number of iterations
+     * /**
+     * Receiving active handler at system termination.
+     * It tracks the nodes from which it receives requests
+     * in a specially crafted vector.
+     * Once he get references to all active nodes,
+     * send them a poisoned message so they can terminate them.
+     *
+     * Akka poisonPill
+     * To kill an actor You can also send the akka.actor.PoisonPill message,
+     * which will stop the actor when the message is processed.
+     * PoisonPill is enqueued as ordinary messages
+     * and will be handled after messages
+     * that were already queued in the mailbox.
      *
      * @see Value
      * @return receive handler
@@ -139,51 +165,25 @@ class Aggregator extends AbstractActor {
             /* can compute the cluster */
             if(current[size] == size){
                 ArrayList<Integer> exemplars = new ArrayList<>();
-                for(int i = 0; i < size; i++)
-                    if(current[i] > 0 && !exemplars.contains(i))
-                        exemplars.add(i);
+                for(int i = 0; i < size; i++) if(current[i] > 0 && !exemplars.contains(i)) exemplars.add(i);
 
                 int[] e = new int[exemplars.size()];
-                for(int i= 0; i < exemplars.size(); i++) e[i] = exemplars.get(i);
+                for(int i = 0; i < exemplars.size(); i++) e[i] = exemplars.get(i);
 
-                if(!isChanged(buildCluster(e,verbose,showGraph), value.iteration) &&
-                        value.iteration - previousClusterIteration > Constant.enoughIterations){
-                    getContext().become(killMode,true);
+                if(!isChanged(buildCluster(e,verbose,showGraph), value.iteration)
+                        && value.iteration - previousClusterIteration > Constant.enoughIterations) {
+                    timer.stop();
+                    log.info("Job done U_U after " + previousClusterIteration + " iterations and " + timer);
+
+                    for(ActorRef node : nodes) node.tell(akka.actor.PoisonPill.getInstance(),ActorRef.noSender());
+                    context().system().terminate();
                 }
                 values.remove(value.iteration);
             }
         })
+        .match(Neighbors.class, msg -> this.nodes = msg.array)
         .build();
     }
-
-    /**
-     * Receiving active handler at system termination.
-     * It tracks the nodes from which it receives requests
-     * in a specially crafted vector.
-     * Once he get references to all active nodes,
-     * send them a poisoned message so they can terminate them.
-     *
-     * Akka poisonPill
-     * To kill an actor You can also send the akka.actor.PoisonPill message,
-     * which will stop the actor when the message is processed.
-     * PoisonPill is enqueued as ordinary messages
-     * and will be handled after messages
-     * that were already queued in the mailbox.
-     */
-    private final Receive killMode = receiveBuilder()
-            .match(Value.class, msg -> {
-                if(nodes == null) nodes = new ArrayList<>();
-                if(!nodes.contains(sender())) nodes.add(sender());
-                if(nodes.size() == size){
-                    for(ActorRef actorRef : nodes)
-                        actorRef.tell(akka.actor.PoisonPill.getInstance(),ActorRef.noSender());
-
-                    timer.stop();
-                    log.info("Job done U_U after " + previousClusterIteration + " iterations and " + timer);
-                    context().system().terminate();
-                }
-            })
-            .build();
 
     /**
      * Creating the cluster
@@ -198,32 +198,16 @@ class Aggregator extends AbstractActor {
      */
     private int[] buildCluster(int[] exemplars, boolean verbose, boolean showGraph){
         int[] cluster = new int[size];
+        int index;
 
-        /*Stream<String> lines = Files.lines(Paths.get(lineMatrix))*/
-        try (BufferedReader reader = new BufferedReader( new InputStreamReader( new FileInputStream(lineMatrix), "UTF-8"))) {
-            for (int i = 0; i < size; i++) {
-                double[] i_similarity = new double[size];
-                i_similarity = Util.stringToVector(reader.readLine(),i_similarity);//TODO:to test
-
-                double max = Util.min_double;
-                int index = -1;
-                for (int k : exemplars) {
-                    if (max < i_similarity[k]) {
-                        max = i_similarity[k];
-                        index = k;
-                    }
-                }
-                cluster[i] = index;
+        for(int i = 0; i < size; i++){
+            cluster[i] = -1;
+            for(int k : compactSimilarity[i]) if((index = java.util.Arrays.binarySearch(exemplars, k)) >= 0){
+                cluster[i] = exemplars[index]; break;
             }
-        } catch (IOException e) {
-            e.printStackTrace();
-            System.exit(1);
         }
 
-        if(verbose)
-            for (int i = 0; i < size; i++)
-                log.info(i + " belong to " + cluster[i]);
-
+        if(verbose) for(int i = 0; i < size; i++) log.info(i + " belong to " + cluster[i]);
         if(showGraph) (new VisualGraph(exemplars,cluster)).show(800,800);
         return cluster;
     }
@@ -257,5 +241,29 @@ class Aggregator extends AbstractActor {
 
         /* Is not changed */
         return false;
+    }
+
+    /**
+     * Read from file and memorized a property structure
+     * for fast cluster build.
+     */
+    private void buildSimilarity() {
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(lineMatrix), "UTF-8"))) {
+            double[] line_similarity = new double[size];
+            for (int i = 0; i < size; i++) {
+                line_similarity = Util.stringToVector(reader.readLine(), line_similarity);
+                TreeMap<Double, Integer> not_inf_s = new TreeMap<>((o1, o2) -> (new Double(o2 - o1)).intValue());
+                for(int j = 0; j < line_similarity.length; j++) if(!Util.isMinDouble(line_similarity[j])) not_inf_s.put(line_similarity[j], j);
+
+                compactSimilarity[i] = new int[not_inf_s.values().size()];
+                int j = 0; for(Integer value : not_inf_s.values()){
+                    compactSimilarity[i][j] = value;
+                    j++;
+                }
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+            System.exit(1);
+        }
     }
 }

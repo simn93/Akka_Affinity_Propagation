@@ -164,7 +164,6 @@ class Node extends AbstractActor{
         this.a_row = init.a_row;
         this.r_col = init.r_col;
         sender().tell(new Ready(), self());
-        //System.out.println(self + " started!");
     }
 
     /**
@@ -286,6 +285,12 @@ class Node extends AbstractActor{
                 sum += r_col.get(q);
 
         for (int i = 0; i < a_not_infinite_neighbors.length; i++)
-            a_not_infinite_neighbors[i].tell(new Availability(a_reference[i] != self ? (0 < (r_col.get(a_reference[i]) > 0.0 ? sum - r_col.get(a_reference[i]) : sum) ? 0 : (r_col.get(a_reference[i]) > 0.0 ? sum - r_col.get(a_reference[i]) : sum)) : sum - r_col.get(self), self), self());
+            a_not_infinite_neighbors[i].tell(new Availability(a(i,sum), self), self());
+    }
+
+    private double a(int i, double sum){
+        double r_col_i = r_col.get(a_reference[i]);
+        double sumLess = r_col_i > 0.0 ? sum - r_col_i : sum;
+        return a_reference[i] != self ? (0 < sumLess ? 0 : sumLess) : sum - r_col.get(self);
     }
 }
