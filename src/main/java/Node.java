@@ -111,24 +111,6 @@ class Node extends AbstractActor{
     // Optimizations for less computation
 
     /**
-     * Flags to enable some optimizations to reduce the complexity of the calculations
-     *
-     * In the calculation of responsibilities,
-     * it computes only one time
-     * the maximum of the set {a_row [i] + s_row [i]}
-     * and only between nodes with non infinite similarity
-     */
-    private boolean sendOptimize;
-
-    // Optimizations for less messages
-
-    /**
-     * Flags to enable some optimizations to reduce the number of exchanged node messages.
-     * Avoid sending messages to the nodes with which it has infinite similarity
-     */
-    private boolean optimize;
-
-    /**
      * Denotes the number of nodes such that s_row[i] = -INF
      */
     private int row_infinity;
@@ -184,8 +166,6 @@ class Node extends AbstractActor{
         a_received = 0;
         row_infinity = 0;
         col_infinity = 0;
-        sendOptimize = true;
-        optimize = true;
     }
 
     /**
@@ -260,42 +240,38 @@ class Node extends AbstractActor{
         a_row = new double[size];
         r_col = new double[size];
 
-        if (optimize) {
-            for (int i = 0; i < size; i++) {
-                if (Util.isMinDouble(s_col[i])) {
-                    col_infinity++;
+        for (int i = 0; i < size; i++) {
+            if (Util.isMinDouble(s_col[i])) {
+                col_infinity++;
 
-                    /* r initialize */
-                    r_col[i] = Util.min_double;
-                }
-                if (Util.isMinDouble(s_row[i])) row_infinity++;
+                /* r initialize */
+                r_col[i] = Util.min_double;
             }
+            if (Util.isMinDouble(s_row[i])) row_infinity++;
+        }
 
-            /* size - row_infinite nodes must receive responsibility message */
-            r_not_infinite_neighbors = new ActorRef[size - row_infinity];
+        /* size - row_infinite nodes must receive responsibility message */
+        r_not_infinite_neighbors = new ActorRef[size - row_infinity];
 
-            /* size - col_infinite nodes must receive availability message */
-            a_not_infinite_neighbors = new ActorRef[size - col_infinity];
+        /* size - col_infinite nodes must receive availability message */
+        a_not_infinite_neighbors = new ActorRef[size - col_infinity];
 
-            r_reference = new int[size - row_infinity];
-            a_reference = new int[size - col_infinity];
+        r_reference = new int[size - row_infinity];
+        a_reference = new int[size - col_infinity];
 
-            /* Vector are set */
-            int j = 0, k = 0;
-            for (int i = 0; i < size; i++) {
-                if (!Util.isMinDouble(s_row[i])) {
-                    r_not_infinite_neighbors[j] = neighbors[i];
-                    r_reference[j] = i;
-                    j++;
-                }
-                if (!Util.isMinDouble(s_col[i])) {
-                    a_not_infinite_neighbors[k] = neighbors[i];
-                    a_reference[k] = i;
-                    k++;
-                }
+        /* Vector are set */
+        int j = 0, k = 0;
+        for (int i = 0; i < size; i++) {
+            if (!Util.isMinDouble(s_row[i])) {
+                r_not_infinite_neighbors[j] = neighbors[i];
+                r_reference[j] = i;
+                j++;
             }
-            //assert(j == r_reference.length);
-            //assert(j + row_infinity == size);
+            if (!Util.isMinDouble(s_col[i])) {
+                a_not_infinite_neighbors[k] = neighbors[i];
+                a_reference[k] = i;
+                k++;
+            }
         }
 
         /* node are ready to start */
@@ -391,47 +367,21 @@ class Node extends AbstractActor{
      * @see Responsibility
      */
     private void sendResponsibility(){
-        ActorRef[] sendVector;
-        int[] sendIndex;
-        int sendSize;
-        double[] sendValue;
+        double firstMax, secondMax;
+        int firstK = -1;
+        firstMax = secondMax = Util.min_double;
 
-        if(optimize){
-            sendVector = r_not_infinite_neighbors;
-            sendIndex = r_reference;
-            sendSize = r_not_infinite_neighbors.length;
-        } else {
-            sendVector = neighbors;
-            sendIndex = IntStream.range(0, size).toArray();
-            sendSize = size;
+        for (int i : r_reference) {
+            double value = a_row[i] + s_row[i];
+            if (firstMax <= value) {
+                secondMax = firstMax;
+                firstMax = value;
+                firstK = i;
+            } else if (secondMax <= value) secondMax = value;
         }
-        sendValue = new double[sendSize];
 
-        if(sendOptimize) {
-            double firstMax, secondMax;
-            int firstK = -1;
-            firstMax = secondMax = Util.min_double;
-
-            for (int i : sendIndex) {
-                double value = a_row[i] + s_row[i];
-                if (firstMax <= value) {
-                    secondMax = firstMax;
-                    firstMax = value;
-                    firstK = i;
-                } else if (secondMax <= value) secondMax = value;
-            }
-
-            for(int i = 0; i < sendSize; i++)
-                sendValue[i] = r(sendIndex[i],firstK,firstMax,secondMax);
-                //assert (sendValue[i] == r(sendIndex[i]));
-        } else
-            for(int i = 0; i < sendSize; i++)
-                sendValue[i] = r(sendIndex[i]);
-
-        for (int i = 0; i < sendSize; i++)
-            sendVector[i].tell(new Responsibility(sendValue[i], self), self());
-            //assert (sendValue[i] == r(r_reference[i]));
-            //assert (sendVector[i].compareTo(r_not_infinite_neighbors[i]) == 0);
+        for (int i = 0; i < r_not_infinite_neighbors.length; i++)
+            r_not_infinite_neighbors[i].tell(new Responsibility((r_reference[i] == firstK ? s_row[r_reference[i]] - secondMax : s_row[r_reference[i]] - firstMax), self), self());
     }
 
     /**
@@ -452,151 +402,12 @@ class Node extends AbstractActor{
      * only if r_col[j] is positive.
      */
     private void sendAvailability(){
-        ActorRef[] sendVector;
-        int[] sendIndex;
-        int sendSize;
-        double[] sendValue;
-
-        if(optimize){
-            sendVector = a_not_infinite_neighbors;
-            sendIndex = a_reference;
-            sendSize = a_not_infinite_neighbors.length;
-        } else {
-            sendVector = neighbors;
-            sendIndex = IntStream.range(0, size).toArray();
-            sendSize = size;
-        }
-        sendValue = new double[sendSize];
-
-        if(sendOptimize){
-            double sum = r_col[self];
-            for(int q : sendIndex)
-                if(q != self && r_col[q] > 0.0)
-                    sum += r_col[q];
-
-            for(int i = 0; i < sendSize; i++){
-                if(sendIndex[i] != self) {
-                    sendValue[i] = a(sendIndex[i], sum);
-                    //assert ((a(sendIndex[i],sum) - a(sendIndex[i])) < 10e-6);
-                    //assert (a(sendIndex[i]) == a(a_reference[i]));
-                } else
-                    sendValue[i] = a(sum);
-                    //assert ((a(sum) - a()) < 10e-6);
-            }
-        } else
-            for(int i = 0; i < sendSize; i++)
-                if (sendIndex[i] != self) { sendValue[i] = a(sendIndex[i]); }
-                    else sendValue[i] = a();
-
-        for (int i = 0; i < sendSize; i++)
-            sendVector[i].tell(new Availability(sendValue[i], self), self());
-    }
-
-    /**
-     * Compute r(i,k).
-     * Responsibility r(i,k) sent from node i candidate exemplar k
-     * reflects the accumulated evidence for how well-suited
-     * point k is to serve as exemplar for point i
-     *
-     * r(i,k) = s(i,k) - max, k' s.t. k' != k, {a(i,k')+s(i,k')}
-     * @param k index of node which send r(i,k)
-     * @return r(i,k)
-     */
-    private double r(int k){
-        double max = Util.min_double;
-        /* foreach except k */
-        /* pre condition : max = -INF */
-        for (int i = 0; i < k; i++)
-            max = (max > (a_row[i] + s_row[i])) ? max : (a_row[i] + s_row[i]);//Math.max(max, a_row[i] + s_row[i]);
-        for (int i = k + 1; i < size; i++)
-            max = (max > (a_row[i] + s_row[i])) ? max : (a_row[i] + s_row[i]);//Math.max(max, a_row[i] + s_row[i]);
-        /* post condition : max = maximum, k' != k, 0 <= k' <= size,
-        { a(i,k') + s(i,k') } */
-
-        return s_row[k] - max;
-    }
-
-    /**
-     * Compute r(i,k) in an optimized way.
-     * @param k index of node which send r(i,k)
-     * @param firstK max of {a(i,j)+s(i,j)}
-     * @param firstMax index q such that firstK == a(i,q)+s(i,q)
-     * @param secondMax max of {a(i,j)+s(i,j), j!=firstMax }
-     * @return r(i,k)
-     */
-    private double r(int k, int firstK, double firstMax, double secondMax){
-        return (k == firstK ? s_row[k] - secondMax : s_row[k] - firstMax);
-    }
-
-    /**
-     * Compute a(i,k).
-     * Availability a(i,k), sent from candidate exemplar point k
-     * to point i, reflects the accumulated evidence for
-     * how appropriate it would be for point i to choose
-     * point k as its exemplars
-     *
-     * a(i,k) = min{0, r(k,k)+ Σ, i' s.t. i' != i &amp;&amp; i' != k, (max{0,r(i',k)})}
-     *
-     * @param i index of node which send a(i,k)
-     * @return a(i,k)
-     */
-    private double a(int i){
-        double ret = r_col[self];
-
-        /* pre condition : ret = r(k,k) */
-        for(int q = 0; q < size; q++)
-            if(q != i && q != self && r_col[q] > 0.0)
-                ret += r_col[q];
-        /* post condition : ret = r(k,k) + Σ r(q,k) ,
-         * s.t. q != i && q != self && r[q][i]) > 0.0
-         */
-
-        /* return min { 0 , ret } */
-        return 0 < ret ? 0 : ret;
-    }
-
-    /**
-     * Compute r(i,k) in an optimized way
-     * @param i index of the node which send a(i,k)
-     * @param sum r(k,k) + Σ max{0,r(i,q)} s.t. q != self
-     * @return a(i,k)
-     */
-    private double a(int i, double sum){
-        /* We added too much.
-         * To get the correct result
-         * you have to subtract the possible member too.
-         */
-        if(r_col[i] > 0.0) sum -= r_col[i];
-
-        /* return min { 0 , ret } */
-        return 0 < sum ? 0 : sum;
-    }
-
-    /**
-     * Self availability is updated differently.
-     * This message reflects accumulated evidence that point k
-     * is an exemplar, based on the positive responsibilities
-     * sent to candidate exemplar k from other points
-     *
-     * @return a(k,k)
-     */
-    private double a(){
-        double ret = 0.0;
-        for(int q = 0; q < size; q++)
+        double sum = r_col[self];
+        for(int q : a_reference)
             if(q != self && r_col[q] > 0.0)
-                ret += r_col[q];
+                sum += r_col[q];
 
-        return ret;
-    }
-
-    /**
-     * Compute r(k,k) in an optimized way
-     * We don't need r(k,K) in "sum"
-     *
-     * @param sum r(k,k) + Σ max{0,r(i,q)} s.t. q != self
-     * @return r(k,k)
-     */
-    private double a(double sum){
-        return sum - r_col[self];
+        for (int i = 0; i < a_not_infinite_neighbors.length; i++)
+            a_not_infinite_neighbors[i].tell(new Availability(a_reference[i] != self ? (0 < (r_col[a_reference[i]] > 0.0 ? sum - r_col[a_reference[i]] : sum) ? 0 : (r_col[a_reference[i]] > 0.0 ? sum - r_col[a_reference[i]] : sum)) : sum - r_col[self], self), self());
     }
 }

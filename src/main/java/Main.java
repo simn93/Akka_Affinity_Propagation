@@ -48,11 +48,9 @@ public class Main {
      */
     private static void startSystem(String[] args) {
         /* Graph load */
-        @SuppressWarnings("unused") String default_file = "./infinity_test.txt";
-        if(args.length > 1) //noinspection UnusedAssignment
-            default_file = args[1];
-        double[][] graph = Util.buildGraph(default_file,"  ","",true,Constant.sigma);
-        int size = graph.length;
+        String lineMatrix = "C:/Users/Simone/Dropbox/Università/Affinity Propagation/Dataset/exons_10k.txt";
+        String colMatrix = "C:/Users/Simone/Dropbox/Università/Affinity Propagation/Dataset/Texons_10k.txt";
+        int size = 10001;
 
         /* Address build */
         Address[] nodes_address = new Address[nodes_IP.length];
@@ -67,8 +65,8 @@ public class Main {
             system = ActorSystem.create("creationSystem", ConfigFactory.load("creation"));
 
         /* create control actors */
-        ActorRef aggregator = system.actorOf(Aggregator.props(graph, size),"aggregator");
-        ActorRef dispatcher = system.actorOf(Dispatcher.props(graph, size), "creator");
+        ActorRef aggregator = system.actorOf(Aggregator.props(lineMatrix, size),"aggregator");
+        ActorRef dispatcher = system.actorOf(Dispatcher.props(lineMatrix, colMatrix, size), "creator");
 
         /* Node deploy */
         for(int i = 0; i < size && nodes_address.length > 0 ; i++)

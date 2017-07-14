@@ -13,7 +13,7 @@ class Constant {
     /**
      * Each number of iterations the nodes must send the results to the aggregator
      */
-    public static final int sendEach = 1;
+    public static final int sendEach = 25;
 
     /**
      * Each message is set to lambda time its value from the previous iteration

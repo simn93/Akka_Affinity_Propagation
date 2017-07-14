@@ -214,4 +214,17 @@ class Util {
 
         System.out.println(builder.toString());
     }
+
+    /**
+     * Converts a matlab matrix string line to double vector
+     * @param s string
+     * @return double vector represents string
+     */
+    @SuppressWarnings("unused")
+    public static double[] stringToVector(String s){
+        String[] split = s.split(",");
+        double[] d = new double[split.length];
+        for(int i = 0; i < d.length; i++) d[i] = Double.parseDouble(split[i]);
+        return d;
+    }
 }

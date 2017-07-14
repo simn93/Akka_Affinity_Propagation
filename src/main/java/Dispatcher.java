@@ -1,6 +1,7 @@
 import akka.actor.AbstractActor;
 import akka.actor.ActorRef;
 import akka.actor.Props;
+import java.io.*;
 
 /**
  * Class for assigning and initializing nodes
@@ -14,9 +15,14 @@ class Dispatcher extends AbstractActor {
     private final int size;
 
     /**
-     * graph of similarity
+     * Position of file of matrix memorized by lines
      */
-    private final double[][] Graph;
+    private final String lineMatrix;
+
+    /**
+     * Position of file of matrix memorized by columns
+     */
+    private final String colMatrix;
 
     /**
      * vector of link to nodes
@@ -43,17 +49,38 @@ class Dispatcher extends AbstractActor {
      */
     private int ready;
 
-    static Props props(double[][] Graph, int size) {
-        return Props.create(Dispatcher.class, () -> new Dispatcher(Graph,size));
+    /**
+     * File reader for line of matrix
+     */
+    BufferedReader lineReader;
+
+    /**
+     * File reader for column of matrix
+     */
+    BufferedReader colReader;
+
+    static Props props(String lineMatrix, String colMatrix, int size) {
+        return Props.create(Dispatcher.class, () -> new Dispatcher(lineMatrix,colMatrix,size));
     }
 
-    private Dispatcher(double[][] Graph, int size){
+    private Dispatcher(String lineMatrix, String colMatrix, int size){
         this.size = size;
-        this.Graph = Graph;
+        this.lineMatrix = lineMatrix;
+        this.colMatrix = colMatrix;
 
         this.array = new ActorRef[size];
         this.index = 0;
         this.ready = 0;
+
+        try {
+            this.lineReader = new BufferedReader( new InputStreamReader( new FileInputStream(lineMatrix), "UTF-8"));
+            this.colReader  = new BufferedReader( new InputStreamReader( new FileInputStream(colMatrix) , "UTF-8"));
+        } catch (UnsupportedEncodingException | FileNotFoundException e) {
+            e.printStackTrace();
+            System.exit(1);
+        }
+
+
     }
 
     /**
@@ -93,9 +120,12 @@ class Dispatcher extends AbstractActor {
         double[] row = new double[size];
         double[] col = new double[size];
 
-        for (int j = 0; j < size; j++) {
-            row[j] = Graph[index][j];
-            col[j] = Graph[j][index];
+        try{
+            row = Util.stringToVector(lineReader.readLine());
+            col = Util.stringToVector(colReader.readLine());
+        } catch (IOException e) {
+            e.printStackTrace();
+            System.exit(1);
         }
 
         /* save node link */
@@ -113,6 +143,7 @@ class Dispatcher extends AbstractActor {
             Neighbors neighbors = new Neighbors(array, size);
             for (ActorRef node : array) node.tell(neighbors, ActorRef.noSender());
 
+            try { lineReader.close(); colReader.close(); } catch (IOException e) { e.printStackTrace(); }
             System.out.println("Started " + index + " actor");
         }
     }

@@ -3,6 +3,10 @@ import akka.actor.ActorRef;
 import akka.actor.Props;
 import akka.event.Logging;
 import akka.event.LoggingAdapter;
+import java.io.BufferedReader;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.HashMap;
 
@@ -13,9 +17,9 @@ import java.util.HashMap;
  */
 class Aggregator extends AbstractActor {
     /**
-     * Similarity matrix
+     * Position of file of matrix memorized by lines
      */
-    private final double[][] similarity;
+    private final String lineMatrix;
 
     /**
      * number of nodes
@@ -79,8 +83,8 @@ class Aggregator extends AbstractActor {
      */
     private final LoggingAdapter log = Logging.getLogger(getContext().getSystem(), this);
 
-    static Props props(double[][] similarity, int size) {
-        return Props.create(Aggregator.class, () -> new Aggregator(similarity,size));
+    static Props props(String lineMatrix, int size) {
+        return Props.create(Aggregator.class, () -> new Aggregator(lineMatrix,size));
     }
 
     /**
@@ -88,11 +92,10 @@ class Aggregator extends AbstractActor {
      *
      * Start the timer
      *
-     * @param similarity graph
      * @param size of nodes
      */
-    private Aggregator(double[][] similarity, int size){
-        this.similarity = similarity;
+    private Aggregator(String lineMatrix, int size){
+        this.lineMatrix = lineMatrix;
         this.size = size;
         this.values = new HashMap<>();
 
@@ -196,16 +199,24 @@ class Aggregator extends AbstractActor {
     private int[] buildCluster(int[] exemplars, boolean verbose, boolean showGraph){
         int[] cluster = new int[size];
 
-        for (int i = 0; i < size; i++) {
-            Double max = Util.min_double;
-            int index = -1;
-            for (int k : exemplars) {
-                if (max < similarity[i][k]) {
-                    max = similarity[i][k];
-                    index = k;
+        /*Stream<String> lines = Files.lines(Paths.get(lineMatrix))*/
+        try (BufferedReader reader = new BufferedReader( new InputStreamReader( new FileInputStream(lineMatrix), "UTF-8"))) {
+            for (int i = 0; i < size; i++) {
+                double[] i_similarity = Util.stringToVector(reader.readLine());
+
+                double max = Util.min_double;
+                int index = -1;
+                for (int k : exemplars) {
+                    if (max < i_similarity[k]) {
+                        max = i_similarity[k];
+                        index = k;
+                    }
                 }
+                cluster[i] = index;
             }
-            cluster[i] = index;
+        } catch (IOException e) {
+            e.printStackTrace();
+            System.exit(1);
         }
 
         if(verbose)
