@@ -1,7 +1,12 @@
 import akka.actor.AbstractActor;
 import akka.actor.ActorRef;
 import akka.actor.Props;
-import java.io.*;
+
+import java.io.BufferedReader;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.util.HashMap;
 
 /**
  * Class for assigning and initializing nodes
@@ -15,29 +20,9 @@ class Dispatcher extends AbstractActor {
     private final int size;
 
     /**
-     * Position of file of matrix memorized by lines
-     */
-    private final String lineMatrix;
-
-    /**
-     * Position of file of matrix memorized by columns
-     */
-    private final String colMatrix;
-
-    /**
      * vector of link to nodes
      */
-    private final ActorRef[] array;
-
-    /**
-     * Initialized value at 0.
-     * At any time it indicates what is the index
-     * of the next node to initiate.
-     * When it comes to size,
-     * we know that we have initiated a sufficient number of nodes
-     * to start the algorithm.
-     */
-    private int index;
+    private final ActorRef[] nodes;
 
     /**
      * Initialized value at 0
@@ -49,33 +34,101 @@ class Dispatcher extends AbstractActor {
      */
     private int ready;
 
-    /**
-     * File reader for line of matrix
-     */
-    BufferedReader lineReader;
-
-    /**
-     * File reader for column of matrix
-     */
-    BufferedReader colReader;
-
-    static Props props(String lineMatrix, String colMatrix, int size) {
-        return Props.create(Dispatcher.class, () -> new Dispatcher(lineMatrix,colMatrix,size));
+    static Props props(String lineMatrix, String colMatrix, int size, ActorRef[] nodes) {
+        return Props.create(Dispatcher.class, () -> new Dispatcher(lineMatrix,colMatrix,size,nodes));
     }
 
-    private Dispatcher(String lineMatrix, String colMatrix, int size){
+    /**
+     * Handler for neighbors message
+     *
+     * If optimize is True:
+     * let -/&gt; : not send to
+     *
+     * i -/&gt; k responsibility if s(i,k) = -INF
+     * r(i,k) = -INF
+     * i -/&gt; k availability if s(k,i) = -INF
+     * a(i,k) != -INF
+     * but is not influential for k
+     * when he compute r(k,j) = s(k,j) - max{a(k,i) + -INF}
+     *
+     * col_infinity : The node which cannot reach me
+     * row_infinity : The node i cannot reach
+     *
+     * if s_col[i] is infinity
+     * r_col[i] must be set to infinity
+     *
+     * In addition, the carriers of links to infinite nodes are initialized
+     *
+     * When finished all operations
+     * send a Ready() message to the dispatcher.
+     * The node thus remains awaiting a Start() message
+     *
+     * @param lineMatrix
+     * @param colMatrix
+     * @param size
+     * @param nodes
+     */
+    private Dispatcher(String lineMatrix, String colMatrix, int size, ActorRef[] nodes){
         this.size = size;
-        this.lineMatrix = lineMatrix;
-        this.colMatrix = colMatrix;
+        this.nodes = nodes;
 
-        this.array = new ActorRef[size];
-        this.index = 0;
         this.ready = 0;
 
-        try {
-            this.lineReader = new BufferedReader( new InputStreamReader( new FileInputStream(lineMatrix), "UTF-8"));
-            this.colReader  = new BufferedReader( new InputStreamReader( new FileInputStream(colMatrix) , "UTF-8"));
-        } catch (UnsupportedEncodingException | FileNotFoundException e) {
+        try(
+            BufferedReader lineReader = new BufferedReader( new InputStreamReader( new FileInputStream(lineMatrix), "UTF-8"));
+            BufferedReader colReader  = new BufferedReader( new InputStreamReader( new FileInputStream(colMatrix) , "UTF-8"))){
+
+            for(int i = 0; i < size; i++) {
+                double[] s_row = Util.stringToVector(lineReader.readLine());
+                double[] s_col = Util.stringToVector(colReader.readLine());
+
+                HashMap<Integer,Double> a_row = new HashMap<Integer,Double>();
+                HashMap<Integer,Double> r_col = new HashMap<Integer,Double>();
+                HashMap<Integer,Double> s2_row = new HashMap<Integer,Double>();
+
+                int col_infinity = 0;
+                int row_infinity = 0;
+
+                for (int j = 0; j < size; j++) {
+                    if (Util.isMinDouble(s_col[j])) col_infinity++;
+                    if (Util.isMinDouble(s_row[j])) row_infinity++;
+                }
+
+                /* size - row_infinite nodes must receive responsibility message */
+                ActorRef[] r_not_infinite_neighbors = new ActorRef[size - row_infinity];
+
+                /* size - col_infinite nodes must receive availability message */
+                ActorRef[] a_not_infinite_neighbors = new ActorRef[size - col_infinity];
+
+                int[] r_reference = new int[size - row_infinity];
+                int[] a_reference = new int[size - col_infinity];
+
+                /* Vector are set */
+                int j = 0, k = 0;
+                for (int q = 0; q < size; q++) {
+                    if (!Util.isMinDouble(s_row[q])) {
+                        r_not_infinite_neighbors[j] = nodes[q];
+                        r_reference[j] = q;
+
+                        s2_row.put(q,s_row[j]);
+                        a_row.put(q,0.0);
+
+                        j++;
+                    }
+                    if (!Util.isMinDouble(s_col[q])) {
+                        a_not_infinite_neighbors[k] = nodes[q];
+                        a_reference[k] = q;
+
+                        r_col.put(q,0.0);
+
+                        k++;
+                    }
+                }
+
+                nodes[i].tell(new NodeSetting(s2_row,i,size-col_infinity,size-row_infinity,r_not_infinite_neighbors,a_not_infinite_neighbors,r_reference,a_reference,a_row,r_col),self());
+            }
+            System.out.println(size+" Nodes started!");
+        } catch (IOException e) {
             e.printStackTrace();
             System.exit(1);
         }
@@ -92,59 +145,11 @@ class Dispatcher extends AbstractActor {
     @Override
     public Receive createReceive() {
         return receiveBuilder()
-        .match(Self.class, msg -> selfHandler(sender()))
         .match(Ready.class, msg -> {
             this.ready++;
-            if(ready == size) for(ActorRef node : array) node.tell(new Start(),ActorRef.noSender());
+            //System.out.println(ready + " Nodes ready!");
+            if(ready == size) for(ActorRef node : nodes) node.tell(new Start(),ActorRef.noSender());
         })
         .build();
-    }
-
-    /**
-     * Collect links to nodes
-     *
-     * @param sender : Ref to sender
-     */
-    private void selfHandler(ActorRef sender){
-        /* if we have initialized enough nodes */
-        if (index >= size) {
-            sender.tell(new Die(), self());
-            return;
-        }
-
-        /*
-         * create row and col vector
-         * Instead of sending the whole graph to all nodes
-         * Reliably forward the values of interest
-         */
-        double[] row = new double[size];
-        double[] col = new double[size];
-
-        try{
-            row = Util.stringToVector(lineReader.readLine());
-            col = Util.stringToVector(colReader.readLine());
-        } catch (IOException e) {
-            e.printStackTrace();
-            System.exit(1);
-        }
-
-        /* save node link */
-        array[index] = sender;
-
-        /* send initialize message */
-        sender.tell(new Initialize(row, col, index), ActorRef.noSender());
-
-        /* increase index value */
-        /* wait next node */
-        index++;
-
-        /* check if we have initialized enough nodes */
-        if (index == size) {
-            Neighbors neighbors = new Neighbors(array, size);
-            for (ActorRef node : array) node.tell(neighbors, ActorRef.noSender());
-
-            try { lineReader.close(); colReader.close(); } catch (IOException e) { e.printStackTrace(); }
-            System.out.println("Started " + index + " actor");
-        }
     }
 }

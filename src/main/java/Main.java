@@ -48,8 +48,8 @@ public class Main {
      */
     private static void startSystem(String[] args) {
         /* Graph load */
-        String lineMatrix = "C:/Users/Simone/Dropbox/Università/Affinity Propagation/Dataset/exons_10k.txt";
-        String colMatrix = "C:/Users/Simone/Dropbox/Università/Affinity Propagation/Dataset/Texons_10k.txt";
+        String lineMatrix = "C:/Users/Simo/Dropbox/Università/Affinity Propagation/Dataset/exons_10k.txt";
+        String colMatrix = "C:/Users/Simo/Dropbox/Università/Affinity Propagation/Dataset/exonsT_10k.txt";
         int size = 10001;
 
         /* Address build */
@@ -66,12 +66,14 @@ public class Main {
 
         /* create control actors */
         ActorRef aggregator = system.actorOf(Aggregator.props(lineMatrix, size),"aggregator");
-        ActorRef dispatcher = system.actorOf(Dispatcher.props(lineMatrix, colMatrix, size), "creator");
 
         /* Node deploy */
+        ActorRef[] nodes = new ActorRef[size];
         for(int i = 0; i < size && nodes_address.length > 0 ; i++)
-            system.actorOf(Props.create(Node.class,aggregator,dispatcher)
+            nodes[i] = system.actorOf(Props.create(Node.class,aggregator)
                     .withDeploy(new Deploy(new RemoteScope(nodes_address[i % nodes_address.length]))));
+
+        ActorRef dispatcher = system.actorOf(Dispatcher.props(lineMatrix, colMatrix, size, nodes), "creator");
 
         System.out.println("Started CalculatorSystem");
     }

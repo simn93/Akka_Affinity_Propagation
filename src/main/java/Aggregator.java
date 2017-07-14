@@ -202,7 +202,8 @@ class Aggregator extends AbstractActor {
         /*Stream<String> lines = Files.lines(Paths.get(lineMatrix))*/
         try (BufferedReader reader = new BufferedReader( new InputStreamReader( new FileInputStream(lineMatrix), "UTF-8"))) {
             for (int i = 0; i < size; i++) {
-                double[] i_similarity = Util.stringToVector(reader.readLine());
+                double[] i_similarity = new double[size];
+                i_similarity = Util.stringToVector(reader.readLine(),i_similarity);//TODO:to test
 
                 double max = Util.min_double;
                 int index = -1;

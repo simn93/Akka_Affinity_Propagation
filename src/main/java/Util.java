@@ -224,7 +224,19 @@ class Util {
     public static double[] stringToVector(String s){
         String[] split = s.split(",");
         double[] d = new double[split.length];
-        for(int i = 0; i < d.length; i++) d[i] = Double.parseDouble(split[i]);
+        for(int i = 0; i < d.length; i++){
+            d[i] = Double.parseDouble(split[i]);
+            if(d[i]==0) d[i] = min_double;
+        }
+        return d;
+    }
+
+    public static double[] stringToVector(String s, double[] d){
+        String[] split = s.split(",");
+        for(int i = 0; i < d.length; i++){
+            d[i] = Double.parseDouble(split[i]);
+            if(d[i]==0) d[i] = min_double;
+        }
         return d;
     }
 }

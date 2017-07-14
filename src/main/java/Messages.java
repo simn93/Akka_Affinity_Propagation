@@ -1,5 +1,7 @@
 import akka.actor.ActorRef;
 
+import java.util.HashMap;
+
 /**
  * Class for collecting exchanged messages
  *
@@ -61,6 +63,39 @@ class Initialize implements Messages {
         this.similarity_row = similarity_row;
         this.similarity_col = similarity_col;
         this.selfID = selfID;
+    }
+}
+
+/**
+ *
+ */
+class NodeSetting implements Messages{
+    public final HashMap<Integer,Double> s_row;
+    public final int selfID;
+    public final int r_received_size;
+    public final int a_received_size;
+    public final ActorRef[] r_not_infinite_neighbors;
+    public final ActorRef[] a_not_infinite_neighbors;
+    public final int[] r_reference;
+    public final int[] a_reference;
+    public final HashMap<Integer,Double> a_row;
+    public final HashMap<Integer,Double> r_col;
+
+    NodeSetting(HashMap<Integer,Double> s_row, int selfID,
+                int r_received_size, int a_received_size,
+                ActorRef[] r_not_infinite_neighbors, ActorRef[] a_not_infinite_neighbors,
+                int[] r_reference, int[] a_reference,
+                HashMap<Integer,Double> a_row, HashMap<Integer,Double> r_col) {
+        this.s_row = s_row;
+        this.selfID = selfID;
+        this.r_received_size = r_received_size;
+        this.a_received_size = a_received_size;
+        this.r_not_infinite_neighbors = r_not_infinite_neighbors;
+        this.a_not_infinite_neighbors = a_not_infinite_neighbors;
+        this.r_reference = r_reference;
+        this.a_reference = a_reference;
+        this.a_row = a_row;
+        this.r_col = r_col;
     }
 }
 
