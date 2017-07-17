@@ -3,10 +3,8 @@ import akka.actor.ActorRef;
 import akka.actor.Props;
 import akka.event.Logging;
 import akka.event.LoggingAdapter;
-import java.io.BufferedReader;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStreamReader;
+import scala.Int;
+
 import java.util.*;
 
 /**
@@ -16,35 +14,28 @@ import java.util.*;
  */
 class Aggregator extends AbstractActor {
     /**
-     * Position of file of matrix memorized by lines
-     */
-    private final String lineMatrix;
-
-    /**
      * number of nodes
      */
-    @SuppressWarnings("CanBeFinal")
-    private int size;
+    private final int size;
 
     /**
      * Record of received values
      * It only contains those received for which
      * the cluster has not yet been calculated
+     * <Iteration_number,Values_received,Exemplar_list>
      */
-    private final HashMap<Long,double[]> values;
+    private class Pair {
+        public long counter;
+        public HashSet<Integer> indices;
+        public Pair(){counter = 0; indices = new HashSet<>();}
+    } private final HashMap<Long,Pair> values;
 
     /**
      * Reference to the last cluster calculated
      * other than the ones previously calculated.
      * Useful to check if a new cluster emerged.
      */
-    private int[] previousCluster;
-
-    /**
-     * Indicates which iteration refers to the cluster
-     * stored in the variable previousCluster.
-     */
-    private long previousClusterIteration;
+    private Pair exemplar;
 
     /**
      * Reference list of nodes.
@@ -55,31 +46,9 @@ class Aggregator extends AbstractActor {
     private ActorRef[] nodes;
 
     /**
-     * Collection of similarity optimized.
-     * Each row contains the indexes of the nodes
-     * with which the row number index node has not infinite similarity.
-     * These indexes are sorted in descending order
-     * with respect to the similarity it has
-     * with the index number node of the row.
-     * Ex. M[3][0] = 2 <=> s(3,0) = max {s(3,i)} , 0 <= i < size
-     */
-    private int[][] compactSimilarity;
-
-    /**
-     * if true : print all cluster
-     */
-    private final boolean verbose = false;
-
-    /**
-     * if true : show visual graph
-     */
-    private final boolean showGraph = false;
-
-    /**
      * Timer for time control.
      */
-    @SuppressWarnings("CanBeFinal")
-    private Timer timer;
+     private final Timer timer;
 
     /**
      * Akka logger
@@ -93,8 +62,8 @@ class Aggregator extends AbstractActor {
      */
     private final LoggingAdapter log = Logging.getLogger(getContext().getSystem(), this);
 
-    static Props props(String lineMatrix, int size) {
-        return Props.create(Aggregator.class, () -> new Aggregator(lineMatrix,size));
+    static Props props(int size) {
+        return Props.create(Aggregator.class, () -> new Aggregator(size));
     }
 
     /**
@@ -104,16 +73,14 @@ class Aggregator extends AbstractActor {
      *
      * @param size of nodes
      */
-    private Aggregator(String lineMatrix, int size){
-        this.lineMatrix = lineMatrix;
+    private Aggregator(int size){
         this.size = size;
         this.values = new HashMap<>();
-        this.compactSimilarity = new int[size][];
+        this.exemplar = new Pair();
+        this.exemplar.counter = -1;
 
         timer = new Timer();
         timer.start();
-
-        buildSimilarity();
     }
 
     /**
@@ -152,118 +119,65 @@ class Aggregator extends AbstractActor {
         return receiveBuilder()
         .match(Value.class, value -> {
             /* HashMap vector creation */
-            if(! values.containsKey(value.iteration))
-                values.put(value.iteration,new double[size+1]);
+            if(! values.containsKey(value.iteration)) values.put(value.iteration, new Pair());
+            //if(values.size() > 10) System.out.println(values.size() + " too big");
+            Pair current = values.get(value.iteration);
 
             /* save the value into the vector refereed to iteration value */
-            double[] current = values.get(value.iteration);
-            current[value.sender] = value.value;
-
             /* increase the number of value received refereed to iteration value */
-            current[size] += 1;
+            current.counter++;
+            if(value.value > 0) current.indices.add(value.sender);
 
             /* can compute the cluster */
-            if(current[size] == size){
-                ArrayList<Integer> exemplars = new ArrayList<>();
-                for(int i = 0; i < size; i++) if(current[i] > 0 && !exemplars.contains(i)) exemplars.add(i);
+            if(current.counter == size){
+                current.counter = value.iteration;
+                assert(exemplar.counter < current.counter) : exemplar.counter + " " + current.counter;
+                if(! exemplar.indices.equals(current.indices)){
+                    log.info(current.counter + " " + difference(exemplar.indices,current.indices).toString());
+                    exemplar = current;
+                    //log.info(exemplar.indices.toString());
+                }
 
-                int[] e = new int[exemplars.size()];
-                for(int i = 0; i < exemplars.size(); i++) e[i] = exemplars.get(i);
+                values.remove(value.iteration);
 
-                if(!isChanged(buildCluster(e,verbose,showGraph), value.iteration)
-                        && value.iteration - previousClusterIteration > Constant.enoughIterations) {
+                if(value.iteration - exemplar.counter > Constant.enoughIterations){
                     timer.stop();
-                    log.info("Job done U_U after " + previousClusterIteration + " iterations and " + timer);
+                    log.info("Job done U_U after " + exemplar.counter + " iterations and " + timer);
 
                     for(ActorRef node : nodes) node.tell(akka.actor.PoisonPill.getInstance(),ActorRef.noSender());
                     context().system().terminate();
                 }
-                values.remove(value.iteration);
             }
         })
         .match(Neighbors.class, msg -> this.nodes = msg.array)
         .build();
     }
 
-    /**
-     * Creating the cluster
-     *
-     * It is said that a node "n" belongs to a cluster with reference to an exemplar "e"
-     * if forall of the other exemplars emerged "o" : s(n,e) greater than s(n,o)
-     *
-     * @param exemplars vector
-     * @param verbose if True : print all cluster
-     * @param showGraph if True : show visual graph
-     * @return cluster : i belong to cluster[i]
-     */
-    private int[] buildCluster(int[] exemplars, boolean verbose, boolean showGraph){
-        int[] cluster = new int[size];
-        int index;
+    public HashSet<Integer> union(HashSet<Integer> list1, HashSet<Integer> list2) {
+        HashSet<Integer> set = new HashSet<Integer>();
 
-        for(int i = 0; i < size; i++){
-            cluster[i] = -1;
-            for(int k : compactSimilarity[i]) if((index = java.util.Arrays.binarySearch(exemplars, k)) >= 0){
-                cluster[i] = exemplars[index]; break;
-            }
-        }
+        set.addAll(list1);
+        set.addAll(list2);
 
-        if(verbose) for(int i = 0; i < size; i++) log.info(i + " belong to " + cluster[i]);
-        if(showGraph) (new VisualGraph(exemplars,cluster)).show(800,800);
-        return cluster;
+        return set;
     }
 
-    /**
-     * Checks if the calculated cluster is different from the last different calculated previously
-     * @param cluster to check if is changed
-     * @param iteration to which it refers
-     * @return  True if cluster != previous cluster
-     *          False if cluster == previous cluster
-     */
-    private boolean isChanged(int[] cluster, long iteration){
-        /* I'm calculating a cluster for an old iteration */
-        if(previousClusterIteration > iteration) return false;
+    public HashSet<Integer> intersection(HashSet<Integer> list1, HashSet<Integer> list2) {
+        HashSet<Integer> list = new HashSet<Integer>();
 
-        /* Computing the first cluster */
-        if(previousCluster == null){
-            previousCluster = cluster;
-            previousClusterIteration = iteration;
-            return true;
-        }
-
-        /* Is changed */
-        for(int i = 0; i < size; i++){
-            if(previousCluster[i] != cluster[i]){
-                previousCluster = cluster;
-                previousClusterIteration = iteration;
-                return true;
+        for (Integer t : list1) {
+            if(list2.contains(t)) {
+                list.add(t);
             }
         }
 
-        /* Is not changed */
-        return false;
+        return list;
     }
 
-    /**
-     * Read from file and memorized a property structure
-     * for fast cluster build.
-     */
-    private void buildSimilarity() {
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(lineMatrix), "UTF-8"))) {
-            double[] line_similarity = new double[size];
-            for (int i = 0; i < size; i++) {
-                line_similarity = Util.stringToVector(reader.readLine(), line_similarity);
-                TreeMap<Double, Integer> not_inf_s = new TreeMap<>((o1, o2) -> (new Double(o2 - o1)).intValue());
-                for(int j = 0; j < line_similarity.length; j++) if(!Util.isMinDouble(line_similarity[j])) not_inf_s.put(line_similarity[j], j);
-
-                compactSimilarity[i] = new int[not_inf_s.values().size()];
-                int j = 0; for(Integer value : not_inf_s.values()){
-                    compactSimilarity[i][j] = value;
-                    j++;
-                }
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-            System.exit(1);
-        }
+    public HashSet<Integer> difference(HashSet<Integer> list1, HashSet<Integer> list2){
+        HashSet<Integer> listU = union(list1,list2);
+        HashSet<Integer> listI = intersection(list1,list2);
+        listU.removeAll(listI);
+        return listU;
     }
 }

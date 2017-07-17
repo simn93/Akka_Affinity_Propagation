@@ -49,23 +49,6 @@ class Neighbors implements Messages {
         this.size = size;
     }
 }
-
-/**
- * Initialize class
- * Provides information about the identity that the node will have to assume
- */
-class Initialize implements Messages {
-    public final double[] similarity_row;
-    public final double[] similarity_col;
-    public final int selfID;
-
-    public Initialize(double[] similarity_row, double[] similarity_col, int selfID) {
-        this.similarity_row = similarity_row;
-        this.similarity_col = similarity_col;
-        this.selfID = selfID;
-    }
-}
-
 /**
  *
  */
@@ -114,20 +97,6 @@ class Value implements Messages {
         this.sender = sender;
         this.iteration = iteration;
     }
-}
-
-/**
- * Node hello message for the dispatcher
- */
-class Self implements Messages {
-
-}
-
-/**
- * Error dispatcher message for node: too many nodes were created.
- */
-class Die implements Messages{
-
 }
 
 /**

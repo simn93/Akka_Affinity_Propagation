@@ -48,9 +48,10 @@ public class Main {
      */
     private static void startSystem(String[] args) {
         /* Graph load */
-        String lineMatrix = "C:/Users/Simone/Dropbox/Università/Affinity Propagation/Dataset/exons_10k.txt";
-        String colMatrix = "C:/Users/Simone/Dropbox/Università/Affinity Propagation/Dataset/exonsT_10k.txt";
-        int size = 10001;
+        String lineMatrix = "C:/Users/Simone/Dropbox/Università/Affinity Propagation/Dataset/infTest.txt";//exons_10k.txt";
+        String colMatrix = "C:/Users/Simone/Dropbox/Università/Affinity Propagation/Dataset/infTestT.txt";//exonsT_10k.txt";
+        int size = 456;
+        int dispatcherSize = 5;
 
         /* Address build */
         Address[] nodes_address = new Address[nodes_IP.length];
@@ -65,7 +66,7 @@ public class Main {
             system = ActorSystem.create("creationSystem", ConfigFactory.load("creation"));
 
         /* create control actors */
-        ActorRef aggregator = system.actorOf(Aggregator.props(lineMatrix, size),"aggregator");
+        ActorRef aggregator = system.actorOf(Aggregator.props(size),"aggregator");
 
         /* Node deploy */
         ActorRef[] nodes = new ActorRef[size];
@@ -73,7 +74,13 @@ public class Main {
             nodes[i] = system.actorOf(Props.create(Node.class,aggregator)
                     .withDeploy(new Deploy(new RemoteScope(nodes_address[i % nodes_address.length]))));
 
-        ActorRef dispatcher = system.actorOf(Dispatcher.props(lineMatrix, colMatrix, size, nodes), "creator");
+        int interval = Math.round(size/dispatcherSize), from, to;
+        for(int i = 0; i < dispatcherSize; i++){
+            from = i * interval;
+            to = (i+1) * interval;
+            if(i == dispatcherSize - 1) to = size;
+            system.actorOf(Dispatcher.props(lineMatrix, colMatrix, from, to, size, nodes), "creator"+i);
+        }
         aggregator.tell(new Neighbors(nodes,size),ActorRef.noSender());
 
         System.out.println("Started CalculatorSystem");

@@ -15,9 +15,9 @@ import java.util.HashMap;
  */
 class Dispatcher extends AbstractActor {
     /**
-     * number of nodes
+     * number of node to Start
      */
-    private final int size;
+    private final int localSize;
 
     /**
      * vector of link to nodes
@@ -34,8 +34,8 @@ class Dispatcher extends AbstractActor {
      */
     private int ready;
 
-    static Props props(String lineMatrix, String colMatrix, int size, ActorRef[] nodes) {
-        return Props.create(Dispatcher.class, () -> new Dispatcher(lineMatrix,colMatrix,size,nodes));
+    static Props props(String lineMatrix, String colMatrix, int from, int to, int size, ActorRef[] nodes) {
+        return Props.create(Dispatcher.class, () -> new Dispatcher(lineMatrix,colMatrix,from,to,size,nodes));
     }
 
     /**
@@ -68,9 +68,9 @@ class Dispatcher extends AbstractActor {
      * @param size of the graph
      * @param nodes ref to all nodes
      */
-    private Dispatcher(String lineMatrix, String colMatrix, int size, ActorRef[] nodes){
-        this.size = size;
+    private Dispatcher(String lineMatrix, String colMatrix, int from, int to, int size, ActorRef[] nodes){
         this.nodes = nodes;
+        this.localSize = to - from;
 
         this.ready = 0;
 
@@ -78,9 +78,11 @@ class Dispatcher extends AbstractActor {
             BufferedReader lineReader = new BufferedReader( new InputStreamReader( new FileInputStream(lineMatrix), "UTF-8"));
             BufferedReader colReader  = new BufferedReader( new InputStreamReader( new FileInputStream(colMatrix) , "UTF-8"))){
 
+            for(int z = 0; z < from; z++) { lineReader.readLine(); colReader.readLine(); }
+
             double[] s_row = new double[size];
             double[] s_col = new double[size];
-            for(int i = 0; i < size; i++) {
+            for(int i = from; i < to; i++) {
                 s_row = Util.stringToVector(lineReader.readLine(),s_row);
                 s_col = Util.stringToVector(colReader.readLine(),s_col);
 
@@ -128,7 +130,7 @@ class Dispatcher extends AbstractActor {
                 }
                 nodes[i].tell(new NodeSetting(s2_row,i,size-col_infinity,size-row_infinity,r_not_infinite_neighbors,a_not_infinite_neighbors,r_reference,a_reference,a_row,r_col),self());
             }
-            System.out.println(size+" Nodes started!");
+            System.out.println(localSize+" Nodes started!");
         } catch (IOException e) {
             e.printStackTrace();
             System.exit(1);
@@ -145,9 +147,16 @@ class Dispatcher extends AbstractActor {
         return receiveBuilder()
         .match(Ready.class, msg -> {
             this.ready++;
-            //System.out.println(ready + " Nodes ready!");
-            if(ready == size) for(ActorRef node : nodes) node.tell(new Start(),ActorRef.noSender());
+            if(ready == localSize) {
+                for (ActorRef node : nodes) node.tell(new Start(), ActorRef.noSender());
+                self().tell(akka.actor.PoisonPill.getInstance(), ActorRef.noSender());
+            }
         })
         .build();
+    }
+
+    @Override
+    public void postStop(){
+        System.out.println("Dispatcher terminated.");
     }
 }
