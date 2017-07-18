@@ -43,6 +43,7 @@ class Availability implements Messages {
  */
 class Neighbors implements Messages {
     public final ActorRef[] array;
+    @SuppressWarnings("unused")
     public final int size;
 
     public Neighbors(ActorRef[] array, int size){
@@ -120,8 +121,8 @@ class Ready implements Messages {
  *
  */
 class LocalExemplars implements Messages {
-    public long iteration;
-    public HashSet<Integer> exemplars;
+    public final long iteration;
+    public final HashSet<Integer> exemplars;
 
     public LocalExemplars(long iteration, HashSet<Integer> exemplars){
         this.iteration = iteration;

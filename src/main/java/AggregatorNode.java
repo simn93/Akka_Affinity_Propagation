@@ -4,27 +4,32 @@ import akka.actor.ActorRef;
 import java.util.HashMap;
 
 /**
- * Created by Simo on 18/07/2017.
+ * Class for aggregate and filter node output
+ *
+ * @author Simone Schirinzi
  */
 public class AggregatorNode extends AbstractActor {
     /**
-     *
+     * Number of node to aggregate
      */
     private final int localSize;
 
     /**
-     *
+     * Record of received values
+     * It only contains those received for which
+     * the cluster has not yet been calculated
      */
     private final HashMap<Long,Pair> values;
 
     /**
-     *
+     * Ref to master
      */
     private final ActorRef master;
 
     /**
-     *
-     * @param localSize
+     * Create actor
+     * @param localSize Number of node to aggregate
+     * @param master Ref to master
      */
     public AggregatorNode(int localSize, ActorRef master){
         this.localSize = localSize;
@@ -34,8 +39,12 @@ public class AggregatorNode extends AbstractActor {
     }
 
     /**
+     * Receive value from localSize nodes.
+     * Check and memorize only which their message is > 0.
+     * Send partial exemplar set to master
      *
-     * @return
+     * @see Value
+     * @return actor message receiver
      */
     @Override
     public Receive createReceive() {

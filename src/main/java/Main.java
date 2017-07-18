@@ -9,6 +9,7 @@ import com.typesafe.config.ConfigFactory;
  *
  * @author Simone Schirinzi
  */
+@SuppressWarnings("SpellCheckingInspection")
 public class Main {
     /**
      * List of IPs to deploy nodes
@@ -46,10 +47,11 @@ public class Main {
      * deploy nodes
      * @param args eventually input files
      */
+    @SuppressWarnings("unused")
     private static void startSystem(String[] args) {
         /* Graph load */
-        String lineMatrix = "C:/Users/Simo/Dropbox/Università/Affinity Propagation/Dataset/infTest.txt";//exons_10k.txt";
-        String colMatrix = "C:/Users/Simo/Dropbox/Università/Affinity Propagation/Dataset/infTestT.txt";//exonsT_10k.txt";
+        String lineMatrix = "C:/Users/Simone/Dropbox/Università/Affinity Propagation/Dataset/infTest.txt";//exons_10k.txt";
+        String colMatrix = "C:/Users/Simone/Dropbox/Università/Affinity Propagation/Dataset/infTestT.txt";//exonsT_10k.txt";
         int size = 456;
         int dispatcherSize = 17;
         int aggregatorSize = 11;
@@ -75,14 +77,12 @@ public class Main {
 
         ActorRef[] aggregator = new ActorRef[aggregatorSize];
         int[] aggLink = new int[size];
-        int[] aggLen = new int[aggregatorSize];
 
         for(int i = 0; i < aggregatorSize; i++) {
             from = i * interval;
             to = (i+1) * interval;
             if(i == aggregatorSize - 1) to = size;
             aggregator[i] = system.actorOf(Props.create(AggregatorNode.class,to-from,aggregatorMaster));
-            aggLen[i] = to-from;
         }
 
         int q;
@@ -96,7 +96,7 @@ public class Main {
                     .withDeploy(new Deploy(new RemoteScope(nodes_address[i % nodes_address.length]))));
         }
 
-        /* Dispatcher build */
+        /* DispatcherNode build */
         ActorRef dispatcherMaster = system.actorOf(Props.create(DispatcherMaster.class,nodes,dispatcherSize));
 
         interval = Math.round(size/dispatcherSize);
@@ -104,7 +104,7 @@ public class Main {
             from = i * interval;
             to = (i+1) * interval;
             if(i == dispatcherSize - 1) to = size;
-            system.actorOf(Props.create(Dispatcher.class,lineMatrix, colMatrix, from, to, size, nodes, dispatcherMaster), "creator"+i);
+            system.actorOf(Props.create(DispatcherNode.class,lineMatrix, colMatrix, from, to, size, nodes, dispatcherMaster), "creator"+i);
         }
         aggregatorMaster.tell(new Neighbors(nodes,size),ActorRef.noSender());
 

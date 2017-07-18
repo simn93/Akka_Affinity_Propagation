@@ -12,34 +12,19 @@ import java.util.HashMap;
  *
  * @author Simone Schirinzi
  */
-class Dispatcher extends AbstractActor {
+class DispatcherNode extends AbstractActor {
     /**
-     * number of node to Start
+     * Number of node to Start
      */
     private final int localSize;
 
     /**
-     *
+     * Timer for counting time used
      */
-    private final int from;
+    private final Timer timer;
 
     /**
-     *
-     */
-    private final int to;
-
-    /**
-     *
-     */
-    private Timer timer;
-
-    /**
-     * vector of link to nodes
-     */
-    private final ActorRef[] nodes;
-
-    /**
-     *
+     * Ref to DispatcherMaster
      */
     private final ActorRef master;
 
@@ -83,11 +68,8 @@ class Dispatcher extends AbstractActor {
      * @param size of the graph
      * @param nodes ref to all nodes
      */
-    private Dispatcher(String lineMatrix, String colMatrix, int from, int to, int size, ActorRef[] nodes, ActorRef master){
-        this.nodes = nodes;
+    private DispatcherNode(String lineMatrix, String colMatrix, int from, int to, int size, ActorRef[] nodes, ActorRef master){
         this.localSize = to - from;
-        this.from = from;
-        this.to = to;
         this.master = master;
 
         this.timer = new Timer();
@@ -99,6 +81,7 @@ class Dispatcher extends AbstractActor {
                 BufferedReader lineReader = new BufferedReader( new InputStreamReader( new FileInputStream(lineMatrix), "UTF-8"));
                 BufferedReader colReader  = new BufferedReader( new InputStreamReader( new FileInputStream(colMatrix) , "UTF-8"))){
 
+            /* Skip other lines */
             for(int z = 0; z < from; z++) { lineReader.readLine(); colReader.readLine(); }
 
             double[] s_row = new double[size];
@@ -151,7 +134,6 @@ class Dispatcher extends AbstractActor {
                 }
                 nodes[i].tell(new NodeSetting(s2_row,i,size-col_infinity,size-row_infinity,r_not_infinite_neighbors,a_not_infinite_neighbors,r_reference,a_reference,a_row,r_col),self());
             }
-            //System.out.println(localSize+" Nodes started!");
         } catch (IOException e) {
             e.printStackTrace();
             System.exit(1);

@@ -231,6 +231,13 @@ class Util {
         return d;
     }
 
+    /**
+     * Converts a matlab matrix string line to double vector.
+     * Optimize memory allocation
+     * @param s string
+     * @param d vector of proper size
+     * @return double vector represents string
+     */
     public static double[] stringToVector(String s, double[] d){
         String[] split = s.split(",");
         for(int i = 0; i < d.length; i++){

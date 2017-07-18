@@ -4,6 +4,7 @@
  * @author Simone Schirinzi
  */
 
+@SuppressWarnings("unused")
 class Constant {
     /**
      * Number of iterations where the result must be stable to finish the algorithm
