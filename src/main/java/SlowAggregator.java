@@ -3,16 +3,16 @@ import akka.actor.ActorRef;
 import akka.actor.Props;
 import akka.event.Logging;
 import akka.event.LoggingAdapter;
-import scala.Int;
 
-import java.util.*;
+import java.util.HashMap;
+import java.util.HashSet;
 
 /**
  * Class for cluster computing
  *
  * @author Simone Schirinzi
  */
-class Aggregator extends AbstractActor {
+class SlowAggregator extends AbstractActor {
     /**
      * number of nodes
      */
@@ -24,11 +24,7 @@ class Aggregator extends AbstractActor {
      * the cluster has not yet been calculated
      * <Iteration_number,Values_received,Exemplar_list>
      */
-    private class Pair {
-        public long counter;
-        public HashSet<Integer> indices;
-        public Pair(){counter = 0; indices = new HashSet<>();}
-    } private final HashMap<Long,Pair> values;
+    private final HashMap<Long, Pair> values;
 
     /**
      * Reference to the last cluster calculated
@@ -63,7 +59,7 @@ class Aggregator extends AbstractActor {
     private final LoggingAdapter log = Logging.getLogger(getContext().getSystem(), this);
 
     static Props props(int size) {
-        return Props.create(Aggregator.class, () -> new Aggregator(size));
+        return Props.create(SlowAggregator.class, () -> new SlowAggregator(size));
     }
 
     /**
@@ -73,7 +69,7 @@ class Aggregator extends AbstractActor {
      *
      * @param size of nodes
      */
-    private Aggregator(int size){
+    private SlowAggregator(int size){
         this.size = size;
         this.values = new HashMap<>();
         this.exemplar = new Pair();

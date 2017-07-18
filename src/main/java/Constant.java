@@ -8,12 +8,12 @@ class Constant {
     /**
      * Number of iterations where the result must be stable to finish the algorithm
      */
-    public static final long enoughIterations = 25;
+    public static final long enoughIterations = 50;
 
     /**
      * Each number of iterations the nodes must send the results to the aggregator
      */
-    public static final int sendEach = 10;
+    public static final int sendEach = 1;
 
     /**
      * Each message is set to lambda time its value from the previous iteration

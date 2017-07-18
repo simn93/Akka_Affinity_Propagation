@@ -214,7 +214,7 @@ class Node extends AbstractActor{
             if (this.iteration % (Constant.sendEach) == (Constant.sendEach - 1))
                 aggregator.tell(new Value(r_col.get(self) + a_row.get(self), self, iteration), self());
 
-            if (self == 0) System.out.println("Iteration " + iteration + " completed!");
+            //if (self == 0) System.out.println("Iteration " + iteration + " completed!");
             sendResponsibility();
 
             this.iteration++;

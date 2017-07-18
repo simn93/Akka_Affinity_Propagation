@@ -48,10 +48,11 @@ public class Main {
      */
     private static void startSystem(String[] args) {
         /* Graph load */
-        String lineMatrix = "C:/Users/Simone/Dropbox/Università/Affinity Propagation/Dataset/infTest.txt";//exons_10k.txt";
-        String colMatrix = "C:/Users/Simone/Dropbox/Università/Affinity Propagation/Dataset/infTestT.txt";//exonsT_10k.txt";
+        String lineMatrix = "C:/Users/Simo/Dropbox/Università/Affinity Propagation/Dataset/infTest.txt";//exons_10k.txt";
+        String colMatrix = "C:/Users/Simo/Dropbox/Università/Affinity Propagation/Dataset/infTestT.txt";//exonsT_10k.txt";
         int size = 456;
-        int dispatcherSize = 5;
+        int dispatcherSize = 17;
+        int aggregatorSize = 11;
 
         /* Address build */
         Address[] nodes_address = new Address[nodes_IP.length];
@@ -65,23 +66,47 @@ public class Main {
         else
             system = ActorSystem.create("creationSystem", ConfigFactory.load("creation"));
 
+
+        int interval, from, to;
+
         /* create control actors */
-        ActorRef aggregator = system.actorOf(Aggregator.props(size),"aggregator");
+        interval = Math.floorDiv(size,aggregatorSize);
+        ActorRef aggregatorMaster = system.actorOf(Props.create(AggregatorMaster.class,aggregatorSize),"aggregator");
+
+        ActorRef[] aggregator = new ActorRef[aggregatorSize];
+        int[] aggLink = new int[size];
+        int[] aggLen = new int[aggregatorSize];
+
+        for(int i = 0; i < aggregatorSize; i++) {
+            from = i * interval;
+            to = (i+1) * interval;
+            if(i == aggregatorSize - 1) to = size;
+            aggregator[i] = system.actorOf(Props.create(AggregatorNode.class,to-from,aggregatorMaster));
+            aggLen[i] = to-from;
+        }
+
+        int q;
+        for(q = 0; q < interval*aggregatorSize; q++) aggLink[q] = (q % aggregatorSize);
+        for(;q<size;q++) aggLink[q] = aggregatorSize-1;
 
         /* Node deploy */
         ActorRef[] nodes = new ActorRef[size];
-        for(int i = 0; i < size && nodes_address.length > 0 ; i++)
-            nodes[i] = system.actorOf(Props.create(Node.class,aggregator)
+        for(int i = 0; i < size && nodes_address.length > 0 ; i++) {
+            nodes[i] = system.actorOf(Props.create(Node.class, aggregator[aggLink[i]])
                     .withDeploy(new Deploy(new RemoteScope(nodes_address[i % nodes_address.length]))));
+        }
 
-        int interval = Math.round(size/dispatcherSize), from, to;
+        /* Dispatcher build */
+        ActorRef dispatcherMaster = system.actorOf(Props.create(DispatcherMaster.class,nodes,dispatcherSize));
+
+        interval = Math.round(size/dispatcherSize);
         for(int i = 0; i < dispatcherSize; i++){
             from = i * interval;
             to = (i+1) * interval;
             if(i == dispatcherSize - 1) to = size;
-            system.actorOf(Dispatcher.props(lineMatrix, colMatrix, from, to, size, nodes), "creator"+i);
+            system.actorOf(Props.create(Dispatcher.class,lineMatrix, colMatrix, from, to, size, nodes, dispatcherMaster), "creator"+i);
         }
-        aggregator.tell(new Neighbors(nodes,size),ActorRef.noSender());
+        aggregatorMaster.tell(new Neighbors(nodes,size),ActorRef.noSender());
 
         System.out.println("Started CalculatorSystem");
     }

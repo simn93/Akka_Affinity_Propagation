@@ -1,6 +1,7 @@
 import akka.actor.ActorRef;
 
 import java.util.HashMap;
+import java.util.HashSet;
 
 /**
  * Class for collecting exchanged messages
@@ -113,4 +114,17 @@ class Start implements Messages {
  */
 class Ready implements Messages {
 
+}
+
+/**
+ *
+ */
+class LocalExemplars implements Messages {
+    public long iteration;
+    public HashSet<Integer> exemplars;
+
+    public LocalExemplars(long iteration, HashSet<Integer> exemplars){
+        this.iteration = iteration;
+        this.exemplars = exemplars;
+    }
 }

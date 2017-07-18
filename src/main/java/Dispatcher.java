@@ -1,6 +1,5 @@
 import akka.actor.AbstractActor;
 import akka.actor.ActorRef;
-import akka.actor.Props;
 
 import java.io.BufferedReader;
 import java.io.FileInputStream;
@@ -20,9 +19,29 @@ class Dispatcher extends AbstractActor {
     private final int localSize;
 
     /**
+     *
+     */
+    private final int from;
+
+    /**
+     *
+     */
+    private final int to;
+
+    /**
+     *
+     */
+    private Timer timer;
+
+    /**
      * vector of link to nodes
      */
     private final ActorRef[] nodes;
+
+    /**
+     *
+     */
+    private final ActorRef master;
 
     /**
      * Initialized value at 0
@@ -33,10 +52,6 @@ class Dispatcher extends AbstractActor {
      * but they put them in unprepared structures
      */
     private int ready;
-
-    static Props props(String lineMatrix, String colMatrix, int from, int to, int size, ActorRef[] nodes) {
-        return Props.create(Dispatcher.class, () -> new Dispatcher(lineMatrix,colMatrix,from,to,size,nodes));
-    }
 
     /**
      * Handler for neighbors message
@@ -68,15 +83,21 @@ class Dispatcher extends AbstractActor {
      * @param size of the graph
      * @param nodes ref to all nodes
      */
-    private Dispatcher(String lineMatrix, String colMatrix, int from, int to, int size, ActorRef[] nodes){
+    private Dispatcher(String lineMatrix, String colMatrix, int from, int to, int size, ActorRef[] nodes, ActorRef master){
         this.nodes = nodes;
         this.localSize = to - from;
+        this.from = from;
+        this.to = to;
+        this.master = master;
+
+        this.timer = new Timer();
+        timer.start();
 
         this.ready = 0;
 
         try(
-            BufferedReader lineReader = new BufferedReader( new InputStreamReader( new FileInputStream(lineMatrix), "UTF-8"));
-            BufferedReader colReader  = new BufferedReader( new InputStreamReader( new FileInputStream(colMatrix) , "UTF-8"))){
+                BufferedReader lineReader = new BufferedReader( new InputStreamReader( new FileInputStream(lineMatrix), "UTF-8"));
+                BufferedReader colReader  = new BufferedReader( new InputStreamReader( new FileInputStream(colMatrix) , "UTF-8"))){
 
             for(int z = 0; z < from; z++) { lineReader.readLine(); colReader.readLine(); }
 
@@ -130,7 +151,7 @@ class Dispatcher extends AbstractActor {
                 }
                 nodes[i].tell(new NodeSetting(s2_row,i,size-col_infinity,size-row_infinity,r_not_infinite_neighbors,a_not_infinite_neighbors,r_reference,a_reference,a_row,r_col),self());
             }
-            System.out.println(localSize+" Nodes started!");
+            //System.out.println(localSize+" Nodes started!");
         } catch (IOException e) {
             e.printStackTrace();
             System.exit(1);
@@ -145,18 +166,19 @@ class Dispatcher extends AbstractActor {
     @Override
     public Receive createReceive() {
         return receiveBuilder()
-        .match(Ready.class, msg -> {
-            this.ready++;
-            if(ready == localSize) {
-                for (ActorRef node : nodes) node.tell(new Start(), ActorRef.noSender());
-                self().tell(akka.actor.PoisonPill.getInstance(), ActorRef.noSender());
-            }
-        })
-        .build();
+                .match(Ready.class, msg -> {
+                    this.ready++;
+                    if(ready == localSize) {
+                        master.tell(new Ready(),self());
+                        self().tell(akka.actor.PoisonPill.getInstance(), ActorRef.noSender());
+                    }
+                })
+                .build();
     }
 
     @Override
     public void postStop(){
-        System.out.println("Dispatcher terminated.");
+        timer.stop();
+        System.out.println(localSize + " Dispatched in " + timer);
     }
 }
