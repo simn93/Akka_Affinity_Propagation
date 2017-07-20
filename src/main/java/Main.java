@@ -50,11 +50,11 @@ public class Main {
     @SuppressWarnings("unused")
     private static void startSystem(String[] args) {
         /* Graph load */
-        String lineMatrix = "C:/Users/Simone/Dropbox/Università/Affinity Propagation/Dataset/infTest.txt";//exons_10k.txt";
-        String colMatrix = "C:/Users/Simone/Dropbox/Università/Affinity Propagation/Dataset/infTestT.txt";//exonsT_10k.txt";
+        String lineMatrix = "C:/Users/Simone/Dropbox/Università/Affinity Propagation/Dataset/exons_10k.txt";
+        String colMatrix = "C:/Users/Simone/Dropbox/Università/Affinity Propagation/Dataset/exonsT_10k.txt";
         int size = 456;
-        int dispatcherSize = 17;
-        int aggregatorSize = 11;
+        int dispatcherSize = 4;
+        int aggregatorSize = 4;
 
         /* Address build */
         Address[] nodes_address = new Address[nodes_IP.length];
