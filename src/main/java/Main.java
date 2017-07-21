@@ -50,8 +50,8 @@ public class Main {
     @SuppressWarnings("unused")
     private static void startSystem(String[] args) {
         /* Graph load */
-        String lineMatrix = "C:/Users/Simone/Dropbox/Università/Affinity Propagation/Dataset/exons_10k.txt";
-        String colMatrix = "C:/Users/Simone/Dropbox/Università/Affinity Propagation/Dataset/exonsT_10k.txt";
+        String lineMatrix = "C:/Users/Simone/Dropbox/Università/Affinity Propagation/Dataset/travelling.zip";
+        String colMatrix = "C:/Users/Simone/Dropbox/Università/Affinity Propagation/Dataset/travellingT.zip";
         int size = 456;
         int dispatcherSize = 4;
         int aggregatorSize = 4;

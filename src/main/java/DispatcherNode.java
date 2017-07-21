@@ -1,11 +1,10 @@
 import akka.actor.AbstractActor;
 import akka.actor.ActorRef;
 
-import java.io.BufferedReader;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStreamReader;
+import java.io.*;
 import java.util.HashMap;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 
 /**
  * Class for assigning and initializing nodes
@@ -77,18 +76,35 @@ class DispatcherNode extends AbstractActor {
 
         this.ready = 0;
 
-        try(
-                BufferedReader lineReader = new BufferedReader( new InputStreamReader( new FileInputStream(lineMatrix), "UTF-8"));
-                BufferedReader colReader  = new BufferedReader( new InputStreamReader( new FileInputStream(colMatrix) , "UTF-8"))){
+        try(ZipInputStream lineReader = new ZipInputStream(new BufferedInputStream(new FileInputStream(lineMatrix)));
+            ZipInputStream colReader = new ZipInputStream(new BufferedInputStream(new FileInputStream(colMatrix)))){
 
-            /* Skip other lines */
-            for(int z = 0; z < from; z++) { lineReader.readLine(); colReader.readLine(); }
-
+            byte[] rowBuffer = new byte[size*Double.BYTES];
+            byte[] colBuffer = new byte[size*Double.BYTES];
             double[] s_row = new double[size];
             double[] s_col = new double[size];
+
+            /* Select the (unique) file to read */
+            assert(null != lineReader.getNextEntry());
+            assert(null != colReader.getNextEntry());
+
+            /* Skip bytes */
+            long longSize = Double.BYTES;
+            assert (from*size*longSize == lineReader.skip(from*size*longSize));
+            assert (from*size*longSize == colReader.skip(from*size*longSize));
+
+            int readLen;
             for(int i = from; i < to; i++) {
-                s_row = Util.stringToVector(lineReader.readLine(),s_row);
-                s_col = Util.stringToVector(colReader.readLine(),s_col);
+                readLen = 0;
+                while (readLen < size*Double.BYTES) readLen += lineReader.read(rowBuffer,readLen,size*Double.BYTES - readLen);
+                assert (readLen == size*Double.BYTES);
+
+                readLen = 0;
+                while (readLen < size*Double.BYTES) readLen += colReader.read(colBuffer,readLen,size*Double.BYTES - readLen);
+                assert (readLen == size*Double.BYTES);
+
+                s_row = Util.bytesToVector(rowBuffer,s_row);
+                s_col = Util.bytesToVector(colBuffer,s_col);
 
                 HashMap<Integer,Double> a_row = new HashMap<>();
                 HashMap<Integer,Double> r_col = new HashMap<>();
