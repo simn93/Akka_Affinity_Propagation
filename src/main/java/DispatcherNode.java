@@ -2,10 +2,9 @@ import akka.actor.AbstractActor;
 import akka.actor.ActorRef;
 
 import java.io.BufferedInputStream;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.HashMap;
-import java.util.zip.ZipInputStream;
+import java.util.zip.ZipFile;
 
 /**
  * Class for assigning and initializing nodes
@@ -77,43 +76,38 @@ class DispatcherNode extends AbstractActor {
 
         this.ready = 0;
 
-        try(ZipInputStream lineReader = new ZipInputStream(new BufferedInputStream(new FileInputStream(lineMatrix)));
-            ZipInputStream colReader = new ZipInputStream(new BufferedInputStream(new FileInputStream(colMatrix)))){
+        byte[] rowBuffer = new byte[size * Double.BYTES];
+        byte[] colBuffer = new byte[size * Double.BYTES];
+        double[] s_row = new double[size];
+        double[] s_col = new double[size];
 
-            byte[] rowBuffer = new byte[size*Double.BYTES];
-            byte[] colBuffer = new byte[size*Double.BYTES];
-            double[] s_row = new double[size];
-            double[] s_col = new double[size];
+        int readLen;
+        try(ZipFile lineFile = new ZipFile(lineMatrix); ZipFile colFile = new ZipFile(colMatrix)) {
+            for (int i = from; i < to; i++) {
+                try (BufferedInputStream lineReader = new BufferedInputStream(lineFile.getInputStream(lineFile.getEntry(i+".line")));
+                     BufferedInputStream colReader = new BufferedInputStream(colFile.getInputStream(colFile.getEntry(i+".line")))) {
 
-            for(int i=0; i<from;i++){
-                lineReader.getNextEntry();
-                colReader.getNextEntry();
-                lineReader.closeEntry();
-                colReader.closeEntry();
-            }
+                    //lineReader.getNextEntry();
+                    //colReader.getNextEntry();
 
-            int readLen;
-            for(int i = from; i < to; i++){
-                lineReader.getNextEntry();
-                colReader.getNextEntry();
+                    readLen = 0;
+                    while (readLen < size * Double.BYTES)
+                        readLen += lineReader.read(rowBuffer, readLen, (size * Double.BYTES) - readLen);
+                    assert (readLen == size * Double.BYTES);
 
-                readLen = 0;
-                while (readLen < size * Double.BYTES)
-                    readLen += lineReader.read(rowBuffer, readLen, (size * Double.BYTES) - readLen);
-                assert (readLen == size * Double.BYTES);
+                    readLen = 0;
+                    while (readLen < size * Double.BYTES)
+                        readLen += colReader.read(colBuffer, readLen, (size * Double.BYTES) - readLen);
+                    assert (readLen == size * Double.BYTES);
 
-                readLen = 0;
-                while (readLen < size * Double.BYTES)
-                    readLen += colReader.read(colBuffer, readLen, (size * Double.BYTES) - readLen);
-                assert (readLen == size * Double.BYTES);
+                    s_row = Util.bytesToVector(rowBuffer, s_row);
+                    s_col = Util.bytesToVector(colBuffer, s_col);
 
-                s_row = Util.bytesToVector(rowBuffer, s_row);
-                s_col = Util.bytesToVector(colBuffer, s_col);
+                    sendNodeSetting(i, size, s_row, s_col, nodes);
 
-                sendNodeSetting(i,size,s_row,s_col,nodes);
-
-                lineReader.closeEntry();
-                colReader.closeEntry();
+                    //lineReader.closeEntry();
+                    //colReader.closeEntry();
+                }
             }
         } catch (IOException e) {
             e.printStackTrace();

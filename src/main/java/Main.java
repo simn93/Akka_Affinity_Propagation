@@ -2,6 +2,8 @@ import akka.actor.*;
 import akka.remote.RemoteScope;
 import com.typesafe.config.ConfigFactory;
 
+import java.util.HashMap;
+
 /**
  * Main class
  * first Load file
@@ -51,11 +53,10 @@ public class Main {
     private static void startSystem(String[] args) {
         /* Graph load */
         /* Compressed File: zip of lines of bytes of similarity matrix*/
-        String lineMatrix = "C:/Users/Simo/Dropbox/Università/Affinity Propagation/Dataset/travelling.zip";
-        String colMatrix = "C:/Users/Simo/Dropbox/Università/Affinity Propagation/Dataset/travellingT.zip";
-        int size = 456;
-        int dispatcherSize = 16;
-        int aggregatorSize = 16;
+        String lineMatrix = "C:/Users/Simo/Dropbox/Università/Affinity Propagation/Dataset/geneFind.zip";
+        String colMatrix = "C:/Users/Simo/Dropbox/Università/Affinity Propagation/Dataset/geneFindT.zip";
+        int size = 75067;
+        int subClusterSize = 1000;
 
         /* Address build */
         Address[] nodes_address = new Address[nodes_IP.length];
@@ -72,9 +73,50 @@ public class Main {
 
         int interval, from, to;
 
-        /* create control actors */
+        /**/
+        HashMap<Integer,Integer> clustMap = new HashMap<>();
+        HashMap<Integer,Integer> clustSize = new HashMap<>();
+        for(int i=0, j=0; i<size;j++){
+            if(i + subClusterSize < size) {
+                clustSize.put(j, subClusterSize);
+                i += subClusterSize;
+            } else {
+                clustSize.put(j, size - i);
+                i += size - i;
+            }
+        }
+
+        ActorRef[] nodes = new ActorRef[size];
+
+        ActorRef aggregatorMaster = system.actorOf(Props.create(AggregatorMaster.class,clustSize.size()),"aggregator");
+        ActorRef dispatcherMaster = system.actorOf(Props.create(DispatcherMaster.class,clustSize.size()),"dispatcher");
+
+        int t = 0;
+        for(int i=0; i<clustSize.size(); i++) {
+            Deploy deploy = new Deploy(new RemoteScope(nodes_address[i % nodes_address.length]));
+
+            ActorRef aggregator = system.actorOf(Props.create(AggregatorNode.class, clustSize.get(i),aggregatorMaster).withDeploy(deploy));
+            for(int j=0; j<clustSize.get(i); j++){
+                nodes[t] = system.actorOf(Props.create(Node.class,aggregator).withDeploy(deploy));
+                t++;
+            }
+            //ActorRef dispatcher = system.actorOf(Props.create(DispatcherNode.class,lineMatrix, colMatrix, t-clustSize.get(i), t, size, nodes, dispatcherMaster).withDeploy(deploy));
+        }
+        assert (t==size);
+
+        t = 0;
+        for(int i=0; i<clustSize.size(); i++){
+            Deploy deploy = new Deploy(new RemoteScope(nodes_address[i % nodes_address.length]));
+            t+= clustSize.get(i);
+            ActorRef dispatcher = system.actorOf(Props.create(DispatcherNode.class,lineMatrix, colMatrix, t-clustSize.get(i), t, size, nodes, dispatcherMaster).withDeploy(deploy));
+        }
+        aggregatorMaster.tell(new Neighbors(nodes,size),ActorRef.noSender());
+        dispatcherMaster.tell(new Neighbors(nodes,size),ActorRef.noSender());
+        /**/
+
+        /* create control actors *//*
         interval = Math.floorDiv(size,aggregatorSize);
-        ActorRef aggregatorMaster = system.actorOf(Props.create(AggregatorMaster.class,aggregatorSize),"aggregator");
+
 
         ActorRef[] aggregator = new ActorRef[aggregatorSize];
         int[] aggLink = new int[size];
@@ -90,14 +132,14 @@ public class Main {
         for(q = 0; q < interval*aggregatorSize; q++) aggLink[q] = (q % aggregatorSize);
         for(;q<size;q++) aggLink[q] = aggregatorSize-1;
 
-        /* Node deploy */
+        *//* Node deploy *//*
         ActorRef[] nodes = new ActorRef[size];
         for(int i = 0; i < size && nodes_address.length > 0 ; i++) {
             nodes[i] = system.actorOf(Props.create(Node.class, aggregator[aggLink[i]])
                     .withDeploy(new Deploy(new RemoteScope(nodes_address[i % nodes_address.length]))));
         }
 
-        /* DispatcherNode build */
+        *//* DispatcherNode build *//*
         ActorRef dispatcherMaster = system.actorOf(Props.create(DispatcherMaster.class,nodes,dispatcherSize));
 
         interval = Math.round(size/dispatcherSize);
@@ -107,7 +149,7 @@ public class Main {
             if(i == dispatcherSize - 1) to = size;
             system.actorOf(Props.create(DispatcherNode.class,lineMatrix, colMatrix, from, to, size, nodes, dispatcherMaster), "creator"+i);
         }
-        aggregatorMaster.tell(new Neighbors(nodes,size),ActorRef.noSender());
+        aggregatorMaster.tell(new Neighbors(nodes,size),ActorRef.noSender());*/
 
         System.out.println("Started CalculatorSystem");
     }

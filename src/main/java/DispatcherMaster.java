@@ -9,7 +9,7 @@ public class DispatcherMaster extends AbstractActor {
     /**
      * Refs to nodes
      */
-    private final ActorRef[] nodes;
+    private ActorRef[] nodes;
 
     /**
      * Size of active local dispatcher
@@ -28,8 +28,7 @@ public class DispatcherMaster extends AbstractActor {
      * @param nodes Ref to nodes
      * @param dispatcherSize size of active dispatcher
      */
-    public DispatcherMaster(ActorRef[] nodes, int dispatcherSize){
-        this.nodes = nodes;
+    public DispatcherMaster(int dispatcherSize){
         this.dispatcherSize = dispatcherSize;
         this.ready = 0;
     }
@@ -51,6 +50,7 @@ public class DispatcherMaster extends AbstractActor {
                         self().tell(akka.actor.PoisonPill.getInstance(), ActorRef.noSender());
                     }
                 })
+                .match(Neighbors.class, msg -> this.nodes = msg.array)
                 .build();
     }
 }

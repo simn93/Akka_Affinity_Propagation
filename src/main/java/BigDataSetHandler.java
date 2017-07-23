@@ -8,13 +8,13 @@ import java.nio.ByteBuffer;
 import java.util.zip.*;
 
 public class BigDataSetHandler {
-    private static final String inputTripleteSimilarityRow = "C://Users/Simo/Dropbox/Università/Affinity Propagation/dataset/TravelRoutingMatrix.txt";
-    private static final String inputTripleteSimilarityCol = "C://Users/Simo/Dropbox/Università/Affinity Propagation/dataset/TravelRoutingMatrixT.txt";
+    private static final String inputTripleteSimilarityRow = "C://Users/Simo/Dropbox/Università/Affinity Propagation/dataset/actorMatrix.txt";
+    private static final String inputTripleteSimilarityCol = "C://Users/Simo/Dropbox/Università/Affinity Propagation/dataset/actorMatrixT.txt";
     private static final String inputSinglePreference = "C://Users/Simo/Dropbox/Università/Affinity Propagation/dataset/TravelRoutingPreferences.txt";
-    private static final String outputFile = "C://Users/Simo/Dropbox/Università/Affinity Propagation/dataset/travelling.zip";
-    private static final String outputFileT = "C://Users/Simo/Dropbox/Università/Affinity Propagation/dataset/travellingT.zip";
+    private static final String outputFile = "C://Users/Simo/Dropbox/Università/Affinity Propagation/dataset/author.zip";
+    private static final String outputFileT = "C://Users/Simo/Dropbox/Università/Affinity Propagation/dataset/authorT.zip";
 
-    private static final int size = 456;
+    private static final int size = 5242;
 
     public static void main(String[] args){
         try(BufferedReader rowReader = new BufferedReader( new InputStreamReader( new FileInputStream(inputTripleteSimilarityRow), "UTF-8"));
@@ -24,9 +24,9 @@ public class BigDataSetHandler {
             ZipOutputStream rowOut = new ZipOutputStream(new BufferedOutputStream(new FileOutputStream(outputFile)));
             ZipOutputStream colOut = new ZipOutputStream(new BufferedOutputStream(new FileOutputStream(outputFileT)))) {
 
-            ByteBuffer lineV = ByteBuffer.allocate(size * Double.BYTES);;
+            ByteBuffer lineV = ByteBuffer.allocate(size * Double.BYTES);
 
-            int prevP = 0, currP=-1;
+            int prevP = 0, currP;
             for(int i=0; i<size; i++){
                 rowOut.putNextEntry(new ZipEntry(i+".line"));
                 colOut.putNextEntry(new ZipEntry(i+".line"));
@@ -75,7 +75,7 @@ public class BigDataSetHandler {
             v.putDouble(Double.BYTES * (index-1),value);
         }
 
-        v.putDouble(Double.BYTES * i, Double.parseDouble(prefReader.readLine()));
+        //v.putDouble(Double.BYTES * i, Double.parseDouble(prefReader.readLine()));
         return v;
     }
 
@@ -100,7 +100,7 @@ public class BigDataSetHandler {
             v.putDouble(Double.BYTES * (index-1), value);
         }
 
-        v.putDouble(Double.BYTES * i, Double.parseDouble(prefReader.readLine()));
+        //v.putDouble(Double.BYTES * i, Double.parseDouble(prefReader.readLine()));
         return v;
     }
 }
