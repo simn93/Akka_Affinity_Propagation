@@ -1,9 +1,10 @@
 import akka.actor.AbstractActor;
 import akka.actor.ActorRef;
 
-import java.io.*;
+import java.io.BufferedInputStream;
+import java.io.FileInputStream;
+import java.io.IOException;
 import java.util.HashMap;
-import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
 /**
@@ -84,76 +85,87 @@ class DispatcherNode extends AbstractActor {
             double[] s_row = new double[size];
             double[] s_col = new double[size];
 
-            /* Select the (unique) file to read */
-            assert(null != lineReader.getNextEntry());
-            assert(null != colReader.getNextEntry());
-
-            /* Skip bytes */
-            long longSize = Double.BYTES;
-            assert (from*size*longSize == lineReader.skip(from*size*longSize));
-            assert (from*size*longSize == colReader.skip(from*size*longSize));
+            for(int i=0; i<from;i++){
+                lineReader.getNextEntry();
+                colReader.getNextEntry();
+                lineReader.closeEntry();
+                colReader.closeEntry();
+            }
 
             int readLen;
-            for(int i = from; i < to; i++) {
-                readLen = 0;
-                while (readLen < size*Double.BYTES) readLen += lineReader.read(rowBuffer,readLen,size*Double.BYTES - readLen);
-                assert (readLen == size*Double.BYTES);
+            for(int i = from; i < to; i++){
+                lineReader.getNextEntry();
+                colReader.getNextEntry();
 
                 readLen = 0;
-                while (readLen < size*Double.BYTES) readLen += colReader.read(colBuffer,readLen,size*Double.BYTES - readLen);
-                assert (readLen == size*Double.BYTES);
+                while (readLen < size * Double.BYTES)
+                    readLen += lineReader.read(rowBuffer, readLen, (size * Double.BYTES) - readLen);
+                assert (readLen == size * Double.BYTES);
 
-                s_row = Util.bytesToVector(rowBuffer,s_row);
-                s_col = Util.bytesToVector(colBuffer,s_col);
+                readLen = 0;
+                while (readLen < size * Double.BYTES)
+                    readLen += colReader.read(colBuffer, readLen, (size * Double.BYTES) - readLen);
+                assert (readLen == size * Double.BYTES);
 
-                HashMap<Integer,Double> a_row = new HashMap<>();
-                HashMap<Integer,Double> r_col = new HashMap<>();
-                HashMap<Integer,Double> s2_row = new HashMap<>();
+                s_row = Util.bytesToVector(rowBuffer, s_row);
+                s_col = Util.bytesToVector(colBuffer, s_col);
 
-                int col_infinity = 0;
-                int row_infinity = 0;
+                sendNodeSetting(i,size,s_row,s_col,nodes);
 
-                for (int j = 0; j < size; j++) {
-                    if (Util.isMinDouble(s_col[j])) col_infinity++;
-                    if (Util.isMinDouble(s_row[j])) row_infinity++;
-                }
-
-                /* size - row_infinite nodes must receive responsibility message */
-                ActorRef[] r_not_infinite_neighbors = new ActorRef[size - row_infinity];
-
-                /* size - col_infinite nodes must receive availability message */
-                ActorRef[] a_not_infinite_neighbors = new ActorRef[size - col_infinity];
-
-                int[] r_reference = new int[size - row_infinity];
-                int[] a_reference = new int[size - col_infinity];
-
-                /* Vector are set */
-                int j = 0, k = 0;
-                for (int q = 0; q < size; q++) {
-                    if (!Util.isMinDouble(s_row[q])) {
-                        r_not_infinite_neighbors[j] = nodes[q];
-                        r_reference[j] = q;
-
-                        s2_row.put(q,s_row[j]);
-                        a_row.put(q,0.0);
-
-                        j++;
-                    }
-                    if (!Util.isMinDouble(s_col[q])) {
-                        a_not_infinite_neighbors[k] = nodes[q];
-                        a_reference[k] = q;
-
-                        r_col.put(q,0.0);
-
-                        k++;
-                    }
-                }
-                nodes[i].tell(new NodeSetting(s2_row,i,size-col_infinity,size-row_infinity,r_not_infinite_neighbors,a_not_infinite_neighbors,r_reference,a_reference,a_row,r_col),self());
+                lineReader.closeEntry();
+                colReader.closeEntry();
             }
         } catch (IOException e) {
             e.printStackTrace();
             System.exit(1);
         }
+    }
+
+    private void sendNodeSetting(int i, int size, double[] s_row, double[] s_col, ActorRef[] nodes){
+        HashMap<Integer, Double> a_row = new HashMap<>();
+        HashMap<Integer, Double> r_col = new HashMap<>();
+        HashMap<Integer, Double> s2_row = new HashMap<>();
+
+        int col_infinity = 0;
+        int row_infinity = 0;
+
+        for (int j = 0; j < size; j++) {
+            if (Util.isMinDouble(s_col[j])) col_infinity++;
+            if (Util.isMinDouble(s_row[j])) row_infinity++;
+        }
+
+        /* size - row_infinite nodes must receive responsibility message */
+        ActorRef[] r_not_infinite_neighbors = new ActorRef[size - row_infinity];
+
+        /* size - col_infinite nodes must receive availability message */
+        ActorRef[] a_not_infinite_neighbors = new ActorRef[size - col_infinity];
+
+        int[] r_reference = new int[size - row_infinity];
+        int[] a_reference = new int[size - col_infinity];
+
+        /* Vector are set */
+        int j = 0, k = 0;
+        for (int q = 0; q < size; q++) {
+            if (!Util.isMinDouble(s_row[q])) {
+                r_not_infinite_neighbors[j] = nodes[q];
+                r_reference[j] = q;
+
+                s2_row.put(q, s_row[j]);
+                a_row.put(q, 0.0);
+
+                j++;
+            }
+            if (!Util.isMinDouble(s_col[q])) {
+                a_not_infinite_neighbors[k] = nodes[q];
+                a_reference[k] = q;
+
+                r_col.put(q, 0.0);
+
+                k++;
+            }
+        }
+
+        nodes[i].tell(new NodeSetting(s2_row, i, size - col_infinity, size - row_infinity, r_not_infinite_neighbors, a_not_infinite_neighbors, r_reference, a_reference, a_row, r_col), self());
     }
 
     /**

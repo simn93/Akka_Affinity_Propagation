@@ -45,7 +45,9 @@ public class DispatcherMaster extends AbstractActor {
                 .match(Ready.class, msg ->{
                     this.ready++;
                     if(ready == dispatcherSize){
-                        for(ActorRef node: nodes) node.tell(new Start(), self());
+                        for(ActorRef node: nodes){
+                            node.tell(new Start(), self());
+                        }
                         self().tell(akka.actor.PoisonPill.getInstance(), ActorRef.noSender());
                     }
                 })

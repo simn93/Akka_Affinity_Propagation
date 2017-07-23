@@ -249,18 +249,14 @@ class Util {
     }
 
     public static double[] bytesToVector(byte[] v, double[] d) {
-        ByteBuffer buffer = ByteBuffer.allocate(Double.BYTES);
-        int k = 0;
+        ByteBuffer buffer = ByteBuffer.allocate(v.length);
+        buffer.put(v);
+        buffer.flip();
 
         for (int i = 0; i < d.length; i++) {
-            buffer.clear();
-            for (int j = 0; j < Double.BYTES; j++) {
-                buffer.put(v[k]);
-                k++;
-            }
-            buffer.flip();
             d[i] = buffer.getDouble();
-            if(d[i]==0)d[i]=Util.min_double;
+
+            if(d[i]==0.0)d[i]=Util.min_double;
         }
 
         return d;

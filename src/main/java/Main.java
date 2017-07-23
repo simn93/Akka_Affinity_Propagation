@@ -50,11 +50,12 @@ public class Main {
     @SuppressWarnings("unused")
     private static void startSystem(String[] args) {
         /* Graph load */
-        String lineMatrix = "C:/Users/Simone/Dropbox/Università/Affinity Propagation/Dataset/travelling.zip";
-        String colMatrix = "C:/Users/Simone/Dropbox/Università/Affinity Propagation/Dataset/travellingT.zip";
+        /* Compressed File: zip of lines of bytes of similarity matrix*/
+        String lineMatrix = "C:/Users/Simo/Dropbox/Università/Affinity Propagation/Dataset/travelling.zip";
+        String colMatrix = "C:/Users/Simo/Dropbox/Università/Affinity Propagation/Dataset/travellingT.zip";
         int size = 456;
-        int dispatcherSize = 4;
-        int aggregatorSize = 4;
+        int dispatcherSize = 16;
+        int aggregatorSize = 16;
 
         /* Address build */
         Address[] nodes_address = new Address[nodes_IP.length];
