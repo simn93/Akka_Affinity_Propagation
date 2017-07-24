@@ -1,7 +1,9 @@
 import akka.actor.AbstractActor;
 import akka.actor.ActorRef;
+import akka.actor.dsl.Creators;
 
 import java.util.HashMap;
+import java.util.HashSet;
 
 /**
  * Class for aggregate and filter node output
@@ -34,8 +36,9 @@ public class AggregatorNode extends AbstractActor {
     public AggregatorNode(int localSize, ActorRef master){
         this.localSize = localSize;
         this.master = master;
-
         this.values = new HashMap<>();
+
+        master.tell(new Hello(),self());
     }
 
     /**
@@ -58,6 +61,10 @@ public class AggregatorNode extends AbstractActor {
                         master.tell(new LocalExemplars(value.iteration,current.indices),self());
                         values.remove(value.iteration);
                     }
+                })
+                .match(Ready.class, msg ->{
+                    //if is deployed on the same system with other node, it kill every nodes
+                    context().system().terminate();
                 })
                 .build();
     }

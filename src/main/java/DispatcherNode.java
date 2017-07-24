@@ -4,6 +4,7 @@ import akka.actor.ActorRef;
 import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
 /**
@@ -12,6 +13,10 @@ import java.util.zip.ZipFile;
  * @author Simone Schirinzi
  */
 class DispatcherNode extends AbstractActor {
+    /**
+     *
+     */
+    private final int from;
     /**
      * Number of node to Start
      */
@@ -26,6 +31,11 @@ class DispatcherNode extends AbstractActor {
      * Ref to DispatcherMaster
      */
     private final ActorRef master;
+
+    /**
+     *
+     */
+    private final ActorRef[] nodes;
 
     /**
      * Initialized value at 0
@@ -68,45 +78,51 @@ class DispatcherNode extends AbstractActor {
      * @param nodes ref to all nodes
      */
     private DispatcherNode(String lineMatrix, String colMatrix, int from, int to, int size, ActorRef[] nodes, ActorRef master){
+        this.from = from;
         this.localSize = to - from;
         this.master = master;
+        this.nodes = nodes;
 
         this.timer = new Timer();
         timer.start();
 
         this.ready = 0;
 
-        byte[] rowBuffer = new byte[size * Double.BYTES];
-        byte[] colBuffer = new byte[size * Double.BYTES];
-        double[] s_row = new double[size];
-        double[] s_col = new double[size];
+        byte[] rowBuffer, colBuffer;
+        HashMap<Integer,Double> s_row;
+        HashMap<Integer,Double> s_col;
 
-        int readLen;
+        int readLen, rowSize, colSize;
+        ZipEntry rowEntry, colEntry;
         try(ZipFile lineFile = new ZipFile(lineMatrix); ZipFile colFile = new ZipFile(colMatrix)) {
             for (int i = from; i < to; i++) {
-                try (BufferedInputStream lineReader = new BufferedInputStream(lineFile.getInputStream(lineFile.getEntry(i+".line")));
-                     BufferedInputStream colReader = new BufferedInputStream(colFile.getInputStream(colFile.getEntry(i+".line")))) {
+                rowEntry = lineFile.getEntry(i+".line");
+                colEntry = colFile.getEntry(i+".line");
+                rowSize = (int)(long) rowEntry.getSize();
+                colSize = (int)(long) colEntry.getSize();
+                rowBuffer = new byte[rowSize];
+                colBuffer = new byte[colSize];
 
-                    //lineReader.getNextEntry();
-                    //colReader.getNextEntry();
+                try (BufferedInputStream lineReader = new BufferedInputStream(lineFile.getInputStream(rowEntry));
+                     BufferedInputStream colReader = new BufferedInputStream(colFile.getInputStream(colEntry))) {
 
                     readLen = 0;
-                    while (readLen < size * Double.BYTES)
-                        readLen += lineReader.read(rowBuffer, readLen, (size * Double.BYTES) - readLen);
-                    assert (readLen == size * Double.BYTES);
+                    while (readLen < rowSize)
+                        readLen += lineReader.read(rowBuffer, readLen, rowSize - readLen);
+                    assert (readLen == rowSize);
 
                     readLen = 0;
-                    while (readLen < size * Double.BYTES)
-                        readLen += colReader.read(colBuffer, readLen, (size * Double.BYTES) - readLen);
-                    assert (readLen == size * Double.BYTES);
+                    while (readLen < colSize)
+                        readLen += colReader.read(colBuffer, readLen, colSize - readLen);
+                    assert (readLen == colSize);
 
-                    s_row = Util.bytesToVector(rowBuffer, s_row);
-                    s_col = Util.bytesToVector(colBuffer, s_col);
+                    s_row = new HashMap<>();
+                    s_col = new HashMap<>();
 
-                    sendNodeSetting(i, size, s_row, s_col, nodes);
+                    Util.bytesToHashMap(rowBuffer, s_row);
+                    Util.bytesToHashMap(colBuffer, s_col);
 
-                    //lineReader.closeEntry();
-                    //colReader.closeEntry();
+                    sendNodeSetting(i, s_row, s_col, nodes);
                 }
             }
         } catch (IOException e) {
@@ -115,51 +131,43 @@ class DispatcherNode extends AbstractActor {
         }
     }
 
-    private void sendNodeSetting(int i, int size, double[] s_row, double[] s_col, ActorRef[] nodes){
+    private void sendNodeSetting(int i, HashMap<Integer,Double> s_row, HashMap<Integer,Double> s_col, ActorRef[] nodes){
         HashMap<Integer, Double> a_row = new HashMap<>();
         HashMap<Integer, Double> r_col = new HashMap<>();
-        HashMap<Integer, Double> s2_row = new HashMap<>();
 
-        int col_infinity = 0;
-        int row_infinity = 0;
-
-        for (int j = 0; j < size; j++) {
-            if (Util.isMinDouble(s_col[j])) col_infinity++;
-            if (Util.isMinDouble(s_row[j])) row_infinity++;
-        }
+        int row_unInfinity = s_row.size();
+        int col_unInfinity = s_col.size();
 
         /* size - row_infinite nodes must receive responsibility message */
-        ActorRef[] r_not_infinite_neighbors = new ActorRef[size - row_infinity];
+        ActorRef[] r_not_infinite_neighbors = new ActorRef[row_unInfinity];
 
         /* size - col_infinite nodes must receive availability message */
-        ActorRef[] a_not_infinite_neighbors = new ActorRef[size - col_infinity];
+        ActorRef[] a_not_infinite_neighbors = new ActorRef[col_unInfinity];
 
-        int[] r_reference = new int[size - row_infinity];
-        int[] a_reference = new int[size - col_infinity];
+        int[] r_reference = new int[row_unInfinity];
+        int[] a_reference = new int[col_unInfinity];
 
         /* Vector are set */
         int j = 0, k = 0;
-        for (int q = 0; q < size; q++) {
-            if (!Util.isMinDouble(s_row[q])) {
-                r_not_infinite_neighbors[j] = nodes[q];
-                r_reference[j] = q;
 
-                s2_row.put(q, s_row[j]);
-                a_row.put(q, 0.0);
+        for (int q : s_row.keySet()) {
+            r_not_infinite_neighbors[j] = nodes[q];
+            r_reference[j] = q;
 
-                j++;
-            }
-            if (!Util.isMinDouble(s_col[q])) {
-                a_not_infinite_neighbors[k] = nodes[q];
-                a_reference[k] = q;
+            a_row.put(q, 0.0);
 
-                r_col.put(q, 0.0);
+            j++;
+        }
+        for(int q : s_col.keySet()){
+            a_not_infinite_neighbors[k] = nodes[q];
+            a_reference[k] = q;
 
-                k++;
-            }
+            r_col.put(q, 0.0);
+
+            k++;
         }
 
-        nodes[i].tell(new NodeSetting(s2_row, i, size - col_infinity, size - row_infinity, r_not_infinite_neighbors, a_not_infinite_neighbors, r_reference, a_reference, a_row, r_col), self());
+        nodes[i].tell(new NodeSetting(s_row, i, col_unInfinity, row_unInfinity, r_not_infinite_neighbors, a_not_infinite_neighbors, r_reference, a_reference, a_row, r_col), self());
     }
 
     /**
@@ -174,8 +182,11 @@ class DispatcherNode extends AbstractActor {
                     this.ready++;
                     if(ready == localSize) {
                         master.tell(new Ready(),self());
-                        self().tell(akka.actor.PoisonPill.getInstance(), ActorRef.noSender());
                     }
+                })
+                .match(Start.class, msg ->{
+                    for(int i=from; i< from + localSize; i++)nodes[i].tell(new Start(),self());
+                    self().tell(akka.actor.PoisonPill.getInstance(), ActorRef.noSender());
                 })
                 .build();
     }

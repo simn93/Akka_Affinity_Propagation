@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.HashMap;
 
 /**
  * Class for file load
@@ -260,5 +261,20 @@ class Util {
         }
 
         return d;
+    }
+
+    public static void bytesToHashMap(byte[] v, HashMap<Integer,Double> map){
+        ByteBuffer buffer = ByteBuffer.allocate(v.length);
+        buffer.put(v);
+        buffer.flip();
+
+        int i;
+        double d;
+        while (buffer.hasRemaining()){
+            i = buffer.getInt();
+            d = buffer.getDouble();
+            map.put(i,d);
+        }
+        assert (v.length == map.size() * (Integer.BYTES + Double.BYTES));
     }
 }

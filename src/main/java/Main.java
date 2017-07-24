@@ -53,10 +53,10 @@ public class Main {
     private static void startSystem(String[] args) {
         /* Graph load */
         /* Compressed File: zip of lines of bytes of similarity matrix*/
-        String lineMatrix = "C:/Users/Simo/Dropbox/Università/Affinity Propagation/Dataset/geneFind.zip";
-        String colMatrix = "C:/Users/Simo/Dropbox/Università/Affinity Propagation/Dataset/geneFindT.zip";
-        int size = 75067;
-        int subClusterSize = 1000;
+        String lineMatrix = "C:/Users/Simone/Dropbox/Università/Affinity Propagation/Dataset/author.zip";
+        String colMatrix = "C:/Users/Simone/Dropbox/Università/Affinity Propagation/Dataset/authorT.zip";
+        int size = 5242;
+        int subClusterSize = 500;
 
         /* Address build */
         Address[] nodes_address = new Address[nodes_IP.length];
@@ -112,44 +112,6 @@ public class Main {
         }
         aggregatorMaster.tell(new Neighbors(nodes,size),ActorRef.noSender());
         dispatcherMaster.tell(new Neighbors(nodes,size),ActorRef.noSender());
-        /**/
-
-        /* create control actors *//*
-        interval = Math.floorDiv(size,aggregatorSize);
-
-
-        ActorRef[] aggregator = new ActorRef[aggregatorSize];
-        int[] aggLink = new int[size];
-
-        for(int i = 0; i < aggregatorSize; i++) {
-            from = i * interval;
-            to = (i+1) * interval;
-            if(i == aggregatorSize - 1) to = size;
-            aggregator[i] = system.actorOf(Props.create(AggregatorNode.class,to-from,aggregatorMaster));
-        }
-
-        int q;
-        for(q = 0; q < interval*aggregatorSize; q++) aggLink[q] = (q % aggregatorSize);
-        for(;q<size;q++) aggLink[q] = aggregatorSize-1;
-
-        *//* Node deploy *//*
-        ActorRef[] nodes = new ActorRef[size];
-        for(int i = 0; i < size && nodes_address.length > 0 ; i++) {
-            nodes[i] = system.actorOf(Props.create(Node.class, aggregator[aggLink[i]])
-                    .withDeploy(new Deploy(new RemoteScope(nodes_address[i % nodes_address.length]))));
-        }
-
-        *//* DispatcherNode build *//*
-        ActorRef dispatcherMaster = system.actorOf(Props.create(DispatcherMaster.class,nodes,dispatcherSize));
-
-        interval = Math.round(size/dispatcherSize);
-        for(int i = 0; i < dispatcherSize; i++){
-            from = i * interval;
-            to = (i+1) * interval;
-            if(i == dispatcherSize - 1) to = size;
-            system.actorOf(Props.create(DispatcherNode.class,lineMatrix, colMatrix, from, to, size, nodes, dispatcherMaster), "creator"+i);
-        }
-        aggregatorMaster.tell(new Neighbors(nodes,size),ActorRef.noSender());*/
 
         System.out.println("Started CalculatorSystem");
     }

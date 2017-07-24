@@ -3,18 +3,24 @@
  *
  * @author Simone Schirinzi
  */
+import it.unimi.dsi.fastutil.Hash;
+
 import java.io.*;
 import java.nio.ByteBuffer;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Map;
 import java.util.zip.*;
 
 public class BigDataSetHandler {
-    private static final String inputTripleteSimilarityRow = "C://Users/Simo/Dropbox/Università/Affinity Propagation/dataset/actorMatrix.txt";
-    private static final String inputTripleteSimilarityCol = "C://Users/Simo/Dropbox/Università/Affinity Propagation/dataset/actorMatrixT.txt";
-    private static final String inputSinglePreference = "C://Users/Simo/Dropbox/Università/Affinity Propagation/dataset/TravelRoutingPreferences.txt";
-    private static final String outputFile = "C://Users/Simo/Dropbox/Università/Affinity Propagation/dataset/author.zip";
-    private static final String outputFileT = "C://Users/Simo/Dropbox/Università/Affinity Propagation/dataset/authorT.zip";
+    private static final String inputTripleteSimilarityRow = "C://Users/Simone/Dropbox/Università/Affinity Propagation/dataset/TravelRoutingMatrix.txt";
+    private static final String inputTripleteSimilarityCol = "C://Users/Simone/Dropbox/Università/Affinity Propagation/dataset/TravelRoutingMatrixT.txt";
+    private static final String inputSinglePreference = "C://Users/Simone/Dropbox/Università/Affinity Propagation/dataset/TravelRoutingPreferences.txt";
+    private static final String outputFile = "C://Users/Simone/Dropbox/Università/Affinity Propagation/dataset/travelling.zip";
+    private static final String outputFileT = "C://Users/Simone/Dropbox/Università/Affinity Propagation/dataset/travellingT.zip";
 
-    private static final int size = 5242;
+    private static final int size = 456;
+    private static HashMap<Integer,Double> map;
 
     public static void main(String[] args){
         try(BufferedReader rowReader = new BufferedReader( new InputStreamReader( new FileInputStream(inputTripleteSimilarityRow), "UTF-8"));
@@ -24,20 +30,18 @@ public class BigDataSetHandler {
             ZipOutputStream rowOut = new ZipOutputStream(new BufferedOutputStream(new FileOutputStream(outputFile)));
             ZipOutputStream colOut = new ZipOutputStream(new BufferedOutputStream(new FileOutputStream(outputFileT)))) {
 
-            ByteBuffer lineV = ByteBuffer.allocate(size * Double.BYTES);
-
             int prevP = 0, currP;
             for(int i=0; i<size; i++){
                 rowOut.putNextEntry(new ZipEntry(i+".line"));
                 colOut.putNextEntry(new ZipEntry(i+".line"));
 
-                for(int j = 0; j < size; j++)lineV.putDouble(j*Double.BYTES,0.0);
-                lineV = readLine(i,rowReader,rowPrefReader,lineV);
-                rowOut.write(lineV.array());
+                map = new HashMap<>();
+                readLine(i,rowReader,rowPrefReader,map);
+                rowOut.write(HashMapToByteArray(map));
 
-                for(int j = 0; j < size; j++)lineV.putDouble(j*Double.BYTES,0.0);
-                lineV = readCol(i,colReader,colPrefReader,lineV);
-                colOut.write(lineV.array());
+                map = new HashMap<>();
+                readCol(i,colReader,colPrefReader,map);
+                colOut.write(HashMapToByteArray(map));
 
                 currP = Math.floorDiv(i*100,size);
                 if(currP != prevP){
@@ -54,7 +58,7 @@ public class BigDataSetHandler {
         }
     }
 
-    private static ByteBuffer readLine(int i, BufferedReader reader, BufferedReader prefReader, ByteBuffer v) throws IOException {
+    private static void readLine(int i, BufferedReader reader, BufferedReader prefReader, HashMap<Integer,Double> map) throws IOException {
         String[] split = reader.readLine().split(" ");
         String[] firstSplit = split[0].split(",");
         assert (Integer.parseInt(firstSplit[0]) == i);
@@ -65,21 +69,20 @@ public class BigDataSetHandler {
 
         index = (Integer.parseInt(firstSplit[2]));
         value = Double.parseDouble(firstSplit[3]);
-        v.putDouble(Double.BYTES * (index-1), value);
+        map.put(index-1,value);
 
         for(int j=1; j < split.length; j++){
             otherSplit = split[j].split(",");
 
             index = Integer.parseInt(otherSplit[1]);
             value = Double.parseDouble(otherSplit[2]);
-            v.putDouble(Double.BYTES * (index-1),value);
+            map.put(index-1,value);
         }
 
-        //v.putDouble(Double.BYTES * i, Double.parseDouble(prefReader.readLine()));
-        return v;
+        map.put(i, Double.parseDouble(prefReader.readLine()));
     }
 
-    private static ByteBuffer readCol(int i, BufferedReader reader, BufferedReader prefReader, ByteBuffer v) throws IOException {
+    private static void readCol(int i, BufferedReader reader, BufferedReader prefReader, HashMap<Integer,Double> map) throws IOException {
         String[] split = reader.readLine().split(" ");
         String[] firstSplit = split[0].split(",");
         assert (Integer.parseInt(firstSplit[0]) == i);
@@ -90,17 +93,25 @@ public class BigDataSetHandler {
 
         index = (Integer.parseInt(firstSplit[1]));
         value = Double.parseDouble(firstSplit[3]);
-        v.putDouble(Double.BYTES * (index-1), value);
+        map.put(index-1, value);
 
         for(int j=1; j < split.length; j++){
             otherSplit = split[j].split(",");
 
             index = Integer.parseInt(otherSplit[0]);
             value = Double.parseDouble(otherSplit[2]);
-            v.putDouble(Double.BYTES * (index-1), value);
+            map.put(index-1, value);
         }
 
-        //v.putDouble(Double.BYTES * i, Double.parseDouble(prefReader.readLine()));
-        return v;
+        map.put(i, Double.parseDouble(prefReader.readLine()));
+    }
+
+    private static byte[] HashMapToByteArray(HashMap<Integer,Double> map){
+        ByteBuffer buffer = ByteBuffer.allocate((Integer.BYTES + Double.BYTES) * map.size());
+        for(Map.Entry<Integer,Double> e : map.entrySet()){
+            buffer.putInt(e.getKey());
+            buffer.putDouble(e.getValue());
+        }
+        return buffer.array();
     }
 }

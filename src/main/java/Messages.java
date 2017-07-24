@@ -129,3 +129,9 @@ class LocalExemplars implements Messages {
         this.exemplars = exemplars;
     }
 }
+
+/**
+ *
+ */
+class Hello implements Messages {
+}

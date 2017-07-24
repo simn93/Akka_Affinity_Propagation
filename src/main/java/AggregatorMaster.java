@@ -2,6 +2,8 @@ import akka.actor.AbstractActor;
 import akka.actor.ActorRef;
 import akka.event.Logging;
 import akka.event.LoggingAdapter;
+
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 
@@ -23,6 +25,11 @@ public class AggregatorMaster extends AbstractActor{
      * Number of partial aggregator started
      */
     private final int localAggregatorSize;
+
+    /**
+     *
+     */
+    private final ArrayList<ActorRef> aggregatorRef;
 
     /**
      * Last set of calculated specimens.
@@ -71,7 +78,7 @@ public class AggregatorMaster extends AbstractActor{
         this.localAggregatorSize = localAggregatorSize;
         this.exemplar = new Pair();
         this.exemplars = new HashMap<>();
-
+        this.aggregatorRef = new ArrayList<>();
         this.exemplar.counter = -1;
 
         this.timer = new Timer();
@@ -128,11 +135,13 @@ public class AggregatorMaster extends AbstractActor{
                             timer.stop();
                             log.info("Job done U_U after " + exemplarIt + " iterations and " + timer);
 
-                            for(ActorRef node : nodes) node.tell(akka.actor.PoisonPill.getInstance(),ActorRef.noSender());
+                            for(ActorRef node : aggregatorRef) node.tell(new Ready(),ActorRef.noSender());
                             context().system().terminate();
                         }
                     }
                 })
+                .match(Hello.class, msg ->{
+                    aggregatorRef.add(sender());})
                 .match(Neighbors.class, msg -> this.nodes = msg.array)
                 .build();
     }
