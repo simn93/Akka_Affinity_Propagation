@@ -35,7 +35,7 @@ class Aggregator extends AbstractActor {
      * other than the ones previously calculated.
      * Useful to check if a new cluster emerged.
      */
-    private int[] previousCluster;
+    private ArrayList<Integer> previousCluster;
 
     /**
      * Indicates which iteration refers to the cluster
@@ -143,8 +143,13 @@ class Aggregator extends AbstractActor {
                 int[] e = new int[exemplars.size()];
                 for(int i= 0; i < exemplars.size(); i++) e[i] = exemplars.get(i);
 
-                if(!isChanged(buildCluster(e,verbose,showGraph), value.iteration) &&
-                        value.iteration - previousClusterIteration > Constant.enoughIterations){
+                if(!exemplars.equals(previousCluster)){
+                    previousCluster = exemplars;
+                    previousClusterIteration = value.iteration;
+                    //System.out.println(previousClusterIteration);
+
+                }
+                if(value.iteration - previousClusterIteration > Constant.enoughIterations){
                     getContext().become(killMode,true);
                 }
                 values.remove(value.iteration);
@@ -182,7 +187,8 @@ class Aggregator extends AbstractActor {
             })
             .build();
 
-    /**
+    /*
+    *//**
      * Creating the cluster
      *
      * It is said that a node "n" belongs to a cluster with reference to an exemplar "e"
@@ -192,7 +198,7 @@ class Aggregator extends AbstractActor {
      * @param verbose if True : print all cluster
      * @param showGraph if True : show visual graph
      * @return cluster : i belong to cluster[i]
-     */
+     *//*
     private int[] buildCluster(int[] exemplars, boolean verbose, boolean showGraph){
         int[] cluster = new int[size];
 
@@ -216,25 +222,25 @@ class Aggregator extends AbstractActor {
         return cluster;
     }
 
-    /**
+    *//**
      * Checks if the calculated cluster is different from the last different calculated previously
      * @param cluster to check if is changed
      * @param iteration to which it refers
      * @return  True if cluster != previous cluster
      *          False if cluster == previous cluster
-     */
+     *//*
     private boolean isChanged(int[] cluster, long iteration){
-        /* I'm calculating a cluster for an old iteration */
+        *//* I'm calculating a cluster for an old iteration *//*
         if(previousClusterIteration > iteration) return false;
 
-        /* Computing the first cluster */
+        *//* Computing the first cluster *//*
         if(previousCluster == null){
             previousCluster = cluster;
             previousClusterIteration = iteration;
             return true;
         }
 
-        /* Is changed */
+        *//* Is changed *//*
         for(int i = 0; i < size; i++){
             if(previousCluster[i] != cluster[i]){
                 previousCluster = cluster;
@@ -243,7 +249,7 @@ class Aggregator extends AbstractActor {
             }
         }
 
-        /* Is not changed */
+        *//* Is not changed *//*
         return false;
-    }
+    }*/
 }

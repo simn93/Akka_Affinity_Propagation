@@ -2,6 +2,8 @@ import akka.actor.*;
 import akka.remote.RemoteScope;
 import com.typesafe.config.ConfigFactory;
 
+import java.sql.Time;
+
 /**
  * Main class
  * first Load file
@@ -48,10 +50,16 @@ public class Main {
      */
     private static void startSystem(String[] args) {
         /* Graph load */
-        @SuppressWarnings("unused") String default_file = "./infinity_test.txt";
+        String base = "C://Users/Simone/Dropbox/Università/Affinity Propagation/Dataset/";
+        String default_file = base + "actorOutS.txt";
         if(args.length > 1) //noinspection UnusedAssignment
             default_file = args[1];
-        double[][] graph = Util.buildGraph(default_file,"  ","",true,Constant.sigma);
+
+        Timer timer = new Timer();
+        timer.start();
+        double[][] graph = Util.buildGraph(default_file," ",null,true,Constant.sigma);
+        timer.stop();
+        System.out.println("File read in: " + timer);
         int size = graph.length;
 
         /* Address build */

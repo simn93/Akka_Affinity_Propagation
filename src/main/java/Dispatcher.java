@@ -34,6 +34,11 @@ class Dispatcher extends AbstractActor {
     private int index;
 
     /**
+     *
+     */
+    private Timer timer;
+
+    /**
      * Initialized value at 0
      * At any time it indicates how many nodes
      * Have finished their initialization procedures.
@@ -54,6 +59,9 @@ class Dispatcher extends AbstractActor {
         this.array = new ActorRef[size];
         this.index = 0;
         this.ready = 0;
+
+        this.timer = new Timer();
+        timer.start();
     }
 
     /**
@@ -113,7 +121,8 @@ class Dispatcher extends AbstractActor {
             Neighbors neighbors = new Neighbors(array, size);
             for (ActorRef node : array) node.tell(neighbors, ActorRef.noSender());
 
-            System.out.println("Started " + index + " actor");
+            timer.stop();
+            System.out.println("Started " + index + " actor" + " in: " + timer);
         }
     }
 }
