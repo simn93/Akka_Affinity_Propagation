@@ -2,11 +2,9 @@ import akka.actor.AbstractActor;
 import akka.actor.ActorRef;
 import akka.actor.Props;
 
-import java.io.BufferedReader;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStreamReader;
+import java.io.*;
 import java.util.HashMap;
+import java.util.zip.ZipFile;
 
 /**
  * Class for assigning and initializing nodes
@@ -24,6 +22,10 @@ class Dispatcher extends AbstractActor {
      */
     private final ActorRef[] nodes;
 
+    /**
+     *
+     */
+    private final Timer timer;
     /**
      * Initialized value at 0
      * At any time it indicates how many nodes
@@ -72,11 +74,18 @@ class Dispatcher extends AbstractActor {
         this.size = size;
         this.nodes = nodes;
 
+        this.timer = new Timer();
+        timer.start();
+
         this.ready = 0;
 
+        String rowName = "circuitBoard.txt";
+        String colName = "circuitBoardT.txt";
         try(
-            BufferedReader lineReader = new BufferedReader( new InputStreamReader( new FileInputStream(lineMatrix), "UTF-8"));
-            BufferedReader colReader  = new BufferedReader( new InputStreamReader( new FileInputStream(colMatrix) , "UTF-8"))){
+                ZipFile rowFile = new ZipFile(lineMatrix);
+                ZipFile colFile = new ZipFile(colMatrix);
+                BufferedReader lineReader = new BufferedReader(new InputStreamReader(rowFile.getInputStream(rowFile.getEntry(rowName))));
+                BufferedReader colReader  = new BufferedReader(new InputStreamReader(colFile.getInputStream(colFile.getEntry(colName))))){
 
             double[] s_row = new double[size];
             double[] s_col = new double[size];
@@ -112,7 +121,7 @@ class Dispatcher extends AbstractActor {
                         r_not_infinite_neighbors[j] = nodes[q];
                         r_reference[j] = q;
 
-                        s2_row.put(q,s_row[j]);
+                        s2_row.put(q,s_row[q]);
                         a_row.put(q,0.0);
 
                         j++;
@@ -128,7 +137,7 @@ class Dispatcher extends AbstractActor {
                 }
                 nodes[i].tell(new NodeSetting(s2_row,i,size-col_infinity,size-row_infinity,r_not_infinite_neighbors,a_not_infinite_neighbors,r_reference,a_reference,a_row,r_col),self());
             }
-            System.out.println(size+" Nodes started!");
+
         } catch (IOException e) {
             e.printStackTrace();
             System.exit(1);
@@ -145,8 +154,11 @@ class Dispatcher extends AbstractActor {
         return receiveBuilder()
         .match(Ready.class, msg -> {
             this.ready++;
-            //System.out.println(ready + " Nodes ready!");
-            if(ready == size) for(ActorRef node : nodes) node.tell(new Start(),ActorRef.noSender());
+            if(ready == size){
+                for(ActorRef node : nodes) node.tell(new Start(),ActorRef.noSender());
+                timer.stop();
+                System.out.println(size + " Nodes ready in " + timer);
+            }
         })
         .build();
     }

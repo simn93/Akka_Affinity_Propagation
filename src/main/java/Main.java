@@ -48,9 +48,9 @@ public class Main {
      */
     private static void startSystem(String[] args) {
         /* Graph load */
-        String lineMatrix = "C:/Users/Simone/Dropbox/Università/Affinity Propagation/Dataset/exons_10k.txt";
-        String colMatrix = "C:/Users/Simone/Dropbox/Università/Affinity Propagation/Dataset/exonsT_10k.txt";
-        int size = 10001;
+        String lineMatrix = "C:/Users/Simone/Dropbox/Università/Affinity Propagation/Dataset/circuitBoard.zip";
+        String colMatrix = "C:/Users/Simone/Dropbox/Università/Affinity Propagation/Dataset/circuitBoardT.zip";
+        int size = 1271;
 
         /* Address build */
         Address[] nodes_address = new Address[nodes_IP.length];

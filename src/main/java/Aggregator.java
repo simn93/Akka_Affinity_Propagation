@@ -38,7 +38,7 @@ class Aggregator extends AbstractActor {
      * other than the ones previously calculated.
      * Useful to check if a new cluster emerged.
      */
-    private int[] previousCluster;
+    private ArrayList<Integer> previousCluster;
 
     /**
      * Indicates which iteration refers to the cluster
@@ -63,7 +63,7 @@ class Aggregator extends AbstractActor {
      * with the index number node of the row.
      * Ex. M[3][0] = 2 <=> s(3,0) = max {s(3,i)} , 0 <= i < size
      */
-    private int[][] compactSimilarity;
+    //private int[][] compactSimilarity;
 
     /**
      * if true : print all cluster
@@ -108,12 +108,12 @@ class Aggregator extends AbstractActor {
         this.lineMatrix = lineMatrix;
         this.size = size;
         this.values = new HashMap<>();
-        this.compactSimilarity = new int[size][];
+        //this.compactSimilarity = new int[size][];
 
         timer = new Timer();
         timer.start();
 
-        buildSimilarity();
+        //buildSimilarity();
     }
 
     /**
@@ -165,13 +165,19 @@ class Aggregator extends AbstractActor {
             /* can compute the cluster */
             if(current[size] == size){
                 ArrayList<Integer> exemplars = new ArrayList<>();
-                for(int i = 0; i < size; i++) if(current[i] > 0 && !exemplars.contains(i)) exemplars.add(i);
+                for(int i = 0; i < size; i++)
+                    if(current[i] > 0 && !exemplars.contains(i))
+                        exemplars.add(i);
 
-                int[] e = new int[exemplars.size()];
-                for(int i = 0; i < exemplars.size(); i++) e[i] = exemplars.get(i);
+                //int[] e = new int[exemplars.size()];
+                //for(int i = 0; i < exemplars.size(); i++) e[i] = exemplars.get(i);
 
-                if(!isChanged(buildCluster(e,verbose,showGraph), value.iteration)
-                        && value.iteration - previousClusterIteration > Constant.enoughIterations) {
+                if(!exemplars.equals(previousCluster)) {
+                    previousCluster = exemplars;
+                    previousClusterIteration = value.iteration;
+                }
+
+                if(value.iteration - previousClusterIteration > Constant.enoughIterations){
                     timer.stop();
                     log.info("Job done U_U after " + previousClusterIteration + " iterations and " + timer);
 
@@ -195,7 +201,7 @@ class Aggregator extends AbstractActor {
      * @param verbose if True : print all cluster
      * @param showGraph if True : show visual graph
      * @return cluster : i belong to cluster[i]
-     */
+     *//*
     private int[] buildCluster(int[] exemplars, boolean verbose, boolean showGraph){
         int[] cluster = new int[size];
         int index;
@@ -212,25 +218,25 @@ class Aggregator extends AbstractActor {
         return cluster;
     }
 
-    /**
+    *//**
      * Checks if the calculated cluster is different from the last different calculated previously
      * @param cluster to check if is changed
      * @param iteration to which it refers
      * @return  True if cluster != previous cluster
      *          False if cluster == previous cluster
-     */
+     *//*
     private boolean isChanged(int[] cluster, long iteration){
-        /* I'm calculating a cluster for an old iteration */
+        *//* I'm calculating a cluster for an old iteration *//*
         if(previousClusterIteration > iteration) return false;
 
-        /* Computing the first cluster */
+        *//* Computing the first cluster *//*
         if(previousCluster == null){
             previousCluster = cluster;
             previousClusterIteration = iteration;
             return true;
         }
 
-        /* Is changed */
+        *//* Is changed *//*
         for(int i = 0; i < size; i++){
             if(previousCluster[i] != cluster[i]){
                 previousCluster = cluster;
@@ -239,14 +245,14 @@ class Aggregator extends AbstractActor {
             }
         }
 
-        /* Is not changed */
+        *//* Is not changed *//*
         return false;
     }
 
-    /**
+    *//**
      * Read from file and memorized a property structure
      * for fast cluster build.
-     */
+     *//*
     private void buildSimilarity() {
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(lineMatrix), "UTF-8"))) {
             double[] line_similarity = new double[size];
@@ -265,5 +271,5 @@ class Aggregator extends AbstractActor {
             e.printStackTrace();
             System.exit(1);
         }
-    }
+    }*/
 }
