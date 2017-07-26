@@ -2,6 +2,7 @@ import java.io.BufferedReader;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 
 /**
@@ -239,4 +240,19 @@ class Util {
         }
         return d;
     }
+
+    public static double[] bytesToVector(byte[] v, double[] d) {
+        ByteBuffer buffer = ByteBuffer.allocate(v.length);
+        buffer.put(v);
+        buffer.flip();
+
+        for (int i = 0; i < d.length; i++) {
+            d[i] = buffer.getDouble();
+
+            if(d[i]==0.0)d[i]=Util.min_double;
+        }
+
+        return d;
+    }
+
 }

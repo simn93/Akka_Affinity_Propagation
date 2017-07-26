@@ -79,19 +79,35 @@ class Dispatcher extends AbstractActor {
 
         this.ready = 0;
 
-        String rowName = "circuitBoard.txt";
-        String colName = "circuitBoardT.txt";
         try(
                 ZipFile rowFile = new ZipFile(lineMatrix);
                 ZipFile colFile = new ZipFile(colMatrix);
-                BufferedReader lineReader = new BufferedReader(new InputStreamReader(rowFile.getInputStream(rowFile.getEntry(rowName))));
-                BufferedReader colReader  = new BufferedReader(new InputStreamReader(colFile.getInputStream(colFile.getEntry(colName))))){
+                BufferedInputStream lineReader = new BufferedInputStream(rowFile.getInputStream(rowFile.getEntry("matrix")));
+                BufferedInputStream colReader = new BufferedInputStream(colFile.getInputStream(colFile.getEntry("matrix")))){
+
+            int readLen;
+            int rowSize, colSize;
+            rowSize = colSize = size*Double.BYTES;
 
             double[] s_row = new double[size];
             double[] s_col = new double[size];
+            byte[] rowBuffer = new byte[rowSize];
+            byte[] colBuffer = new byte[colSize];
+
             for(int i = 0; i < size; i++) {
-                s_row = Util.stringToVector(lineReader.readLine(),s_row);
-                s_col = Util.stringToVector(colReader.readLine(),s_col);
+                readLen = 0;
+                while (readLen < rowSize)
+                    readLen += lineReader.read(rowBuffer, readLen, rowSize - readLen);
+                assert (readLen == rowSize);
+
+                readLen = 0;
+                while (readLen < colSize)
+                    readLen += colReader.read(colBuffer, readLen, colSize - readLen);
+                assert (readLen == colSize);
+
+
+                s_row = Util.bytesToVector(rowBuffer,s_row);
+                s_col = Util.bytesToVector(colBuffer,s_col);
 
                 HashMap<Integer,Double> a_row = new HashMap<>();
                 HashMap<Integer,Double> r_col = new HashMap<>();
