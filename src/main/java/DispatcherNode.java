@@ -119,8 +119,8 @@ class DispatcherNode extends AbstractActor {
                     s_row = new HashMap<>();
                     s_col = new HashMap<>();
 
-                    Util.bytesToHashMap(rowBuffer, s_row);
-                    Util.bytesToHashMap(colBuffer, s_col);
+                    Util.hashBytesToHashMap(rowBuffer, s_row);
+                    Util.hashBytesToHashMap(colBuffer, s_col);
 
                     sendNodeSetting(i, s_row, s_col, nodes);
                 }

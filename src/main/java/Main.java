@@ -53,10 +53,10 @@ public class Main {
     private static void startSystem(String[] args) {
         /* Graph load */
         /* Compressed File: zip of lines of bytes of similarity matrix*/
-        String lineMatrix = "C:/Users/Simone/Dropbox/Università/Affinity Propagation/Dataset/author.zip";
-        String colMatrix = "C:/Users/Simone/Dropbox/Università/Affinity Propagation/Dataset/authorT.zip";
-        int size = 5242;
-        int subClusterSize = 500;
+        String lineMatrix = "C:/Users/Simone/Dropbox/Università/Affinity Propagation/Dataset/exonsLineHashByte.zip";
+        String colMatrix = "C:/Users/Simone/Dropbox/Università/Affinity Propagation/Dataset/exonsLineHashByteT.zip";
+        int size = 10001;
+        int subClusterSize = size/8;
 
         /* Address build */
         Address[] nodes_address = new Address[nodes_IP.length];

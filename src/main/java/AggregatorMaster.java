@@ -122,7 +122,7 @@ public class AggregatorMaster extends AbstractActor{
                          * and update the reference to the iteration counter.
                          */
                         if(! exemplar.indices.equals(current.indices)){
-                            log.info(current.counter + " " + difference(exemplar.indices,current.indices).toString());
+                            //log.info(current.counter + " " + difference(exemplar.indices,current.indices).toString());
                             exemplarIt = current.counter;
                         }
 
