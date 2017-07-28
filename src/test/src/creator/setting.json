@@ -1,0 +1,17 @@
+{
+  "deployIP" : [
+    "127.0.0.1"
+  ],
+  "remotePort" : 2553,
+  "lineMatrix" : "",
+  "colMatrix" : "",
+  "lineFormat" : "hashDouble",
+  "size" : 0,
+  "subClusterSize" : 1000,
+  "lambda" : 0.8,
+  "enoughIterations" : 25,
+  "sendEach" : 1,
+  "sigma" : 0.0,
+  "verbose" : false
+
+}

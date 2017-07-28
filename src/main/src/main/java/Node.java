@@ -1,5 +1,6 @@
 import akka.actor.AbstractActor;
 import akka.actor.ActorRef;
+import akka.event.LoggingAdapter;
 
 import java.util.HashMap;
 
@@ -18,6 +19,25 @@ class Node extends AbstractActor{
      */
     private final ActorRef aggregator;
 
+    /**
+     *
+     */
+    private final double lambda;
+
+    /**
+     *
+     */
+    private final int sendEach;
+
+    /**
+     *
+     */
+    private final boolean verbose;
+
+    /**
+     *
+     */
+    private final LoggingAdapter log;
     //------------------
 
     // Received from Initialize
@@ -119,17 +139,13 @@ class Node extends AbstractActor{
      * Send a hello message to the dispatcher
      * @param aggregator link to aggregator
      */
-    public Node(ActorRef aggregator){
+    public Node(ActorRef aggregator, double lambda, int sendEach, boolean verbose, LoggingAdapter log) {
         this.aggregator = aggregator;
+        this.lambda = lambda;
+        this.sendEach = sendEach;
+        this.verbose = verbose;
+        this.log = log;
     }
-
-    /**
-     * The termination phase is started by the aggregator.
-     * It sends a poison pill to the node.
-     * Akka lets you run a last function on the node.
-     * This also ends the systems connected to the nodes.
-     */
-    @Override public void postStop() {getContext().system().terminate();}
 
     /**
      * Receive builder
@@ -177,7 +193,7 @@ class Node extends AbstractActor{
      * @see Responsibility
      */
     private void responsibilityHandler(Responsibility responsibility){
-        r_col.put(responsibility.sender, (r_col.get(responsibility.sender) * Constant.lambda) + (responsibility.value * (1 - Constant.lambda)));
+        r_col.put(responsibility.sender, (r_col.get(responsibility.sender) * lambda) + (responsibility.value * (1 - lambda)));
         r_received++;
 
         if (r_received == r_received_size) {
@@ -204,17 +220,17 @@ class Node extends AbstractActor{
      * @see Availability
      */
     private void availabilityHandler(Availability availability){
-        a_row.put(availability.sender, (a_row.get(availability.sender) * Constant.lambda) + (availability.value * (1 - Constant.lambda)));
+        a_row.put(availability.sender, (a_row.get(availability.sender) * lambda) + (availability.value * (1 - lambda)));
         a_received++;
 
         if (a_received == a_received_size) {
             a_received = 0;
 
             /* End of an iteration. Check whether or not to send an update. */
-            if (this.iteration % (Constant.sendEach) == (Constant.sendEach - 1))
+            if (this.iteration % (sendEach) == (sendEach - 1))
                 aggregator.tell(new Value(r_col.get(self) + a_row.get(self), self, iteration), self());
 
-            //if (self == 0) System.out.println("Iteration " + iteration + " completed!");
+            if (verbose && self == 0) log.info("Iteration " + iteration + " completed!");
             sendResponsibility();
 
             this.iteration++;
@@ -246,7 +262,7 @@ class Node extends AbstractActor{
     private void sendResponsibility(){
         double firstMax, secondMax;
         int firstK = -1;
-        firstMax = secondMax = Util.min_double;
+        firstMax = secondMax = Double.NEGATIVE_INFINITY;
 
         for (int i : r_reference) {
             double value = a_row.get(i) + s_row.get(i);

@@ -1,8 +1,10 @@
 import akka.actor.AbstractActor;
 import akka.actor.ActorRef;
+import akka.event.LoggingAdapter;
 
 import java.io.BufferedInputStream;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
@@ -36,6 +38,16 @@ class DispatcherNode extends AbstractActor {
      *
      */
     private final ActorRef[] nodes;
+
+    /**
+     *
+     */
+    private final double sigma;
+
+    /**
+     *
+     */
+    private final LoggingAdapter log;
 
     /**
      * Initialized value at 0
@@ -74,14 +86,15 @@ class DispatcherNode extends AbstractActor {
      *
      * @param lineMatrix file with matrix memorized by lines
      * @param colMatrix file with matrix memorized by column
-     * @param size of the graph
      * @param nodes ref to all nodes
      */
-    private DispatcherNode(String lineMatrix, String colMatrix, int from, int to, int size, ActorRef[] nodes, ActorRef master){
+    private DispatcherNode(String lineMatrix, String colMatrix, String lineFormat, double sigma, int from, int to, ActorRef[] nodes, ActorRef master, LoggingAdapter log){
         this.from = from;
         this.localSize = to - from;
         this.master = master;
         this.nodes = nodes;
+        this.sigma = sigma;
+        this.log = log;
 
         this.timer = new Timer();
         timer.start();
@@ -119,8 +132,25 @@ class DispatcherNode extends AbstractActor {
                     s_row = new HashMap<>();
                     s_col = new HashMap<>();
 
-                    Util.hashBytesToHashMap(rowBuffer, s_row);
-                    Util.hashBytesToHashMap(colBuffer, s_col);
+                    switch (lineFormat){
+                        case "string" :
+                            stringByteToHashMap(rowBuffer, s_row);
+                            stringByteToHashMap(colBuffer, s_col);
+                            break;
+                        case "hashString" :
+                            hashStringByteToHashMap(rowBuffer, s_row);
+                            hashStringByteToHashMap(colBuffer, s_col);
+                            break;
+                        case "double" :
+                            doubleByteToHashMap(rowBuffer, s_row);
+                            doubleByteToHashMap(colBuffer, s_col);
+                            break;
+                        case "hashDouble" :
+                            hashBytesToHashMap(rowBuffer, s_row);
+                            hashBytesToHashMap(colBuffer, s_col);
+                            break;
+                        default: throw new IOException("line Format unsupported");
+                    }
 
                     sendNodeSetting(i, s_row, s_col, nodes);
                 }
@@ -194,6 +224,75 @@ class DispatcherNode extends AbstractActor {
     @Override
     public void postStop(){
         timer.stop();
-        System.out.println(localSize + " Dispatched in " + timer);
+        log.info(localSize + " Dispatched in " + timer);
+    }
+
+    private void stringByteToHashMap(byte[] v, HashMap<Integer,Double> map){
+        ByteBuffer buffer = ByteBuffer.allocate(v.length);
+        buffer.put(v);
+        buffer.flip();
+
+        String string = new String(buffer.array());
+        String[] split = string.split(",");
+
+        double value;
+        for(int i=0; i<split.length;i++)if((value = Double.parseDouble(split[i]))!=0)map.put(i,value + getNoise());
+    }
+
+    private void hashStringByteToHashMap(byte[] v, HashMap<Integer,Double> map){
+        ByteBuffer buffer = ByteBuffer.allocate(v.length);
+        buffer.put(v);
+        buffer.flip();
+
+        String string = new String(buffer.array());
+        String[] split = string.split(",");
+
+        double value;
+        int index;
+        String[] subSplit;
+        for(String s : split){
+            subSplit = s.split(" ");
+            index = Integer.parseInt(subSplit[0]);
+            value = Double.parseDouble(subSplit[1]) + getNoise();
+            map.put(index,value);
+        }
+    }
+
+    private void doubleByteToHashMap(byte[] v, HashMap<Integer,Double> map){
+        ByteBuffer buffer = ByteBuffer.allocate(v.length);
+        buffer.put(v);
+        buffer.flip();
+
+        double value;
+        int index = 0;
+        while (buffer.hasRemaining()){
+            value = buffer.getDouble();
+            if(value != 0){
+                map.put(index,value + getNoise());
+            }
+            index++;
+        }
+    }
+
+    private void hashBytesToHashMap(byte[] v, HashMap<Integer,Double> map) {
+        ByteBuffer buffer = ByteBuffer.allocate(v.length);
+        buffer.put(v);
+        buffer.flip();
+
+        double value;
+        int index;
+        while (buffer.hasRemaining()) {
+            index = buffer.getInt();
+            value = buffer.getDouble() + getNoise();
+            map.put(index, value);
+        }
+        assert (v.length == map.size() * (Integer.BYTES + Double.BYTES));
+    }
+
+    private double getNoise(){
+        double random = Math.random();
+        random -= 0.5;
+        random *= sigma;
+        return random;
     }
 }

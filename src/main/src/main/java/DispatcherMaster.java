@@ -1,6 +1,5 @@
 import akka.actor.AbstractActor;
 import akka.actor.ActorRef;
-
 import java.util.ArrayList;
 
 /**
@@ -8,11 +7,6 @@ import java.util.ArrayList;
  * @author Simone Schirinzi
  */
 public class DispatcherMaster extends AbstractActor {
-    /**
-     * Refs to nodes
-     */
-    private ActorRef[] nodes;
-
     /**
      *
      */
@@ -59,7 +53,6 @@ public class DispatcherMaster extends AbstractActor {
                         self().tell(akka.actor.PoisonPill.getInstance(), ActorRef.noSender());
                     }
                 })
-                .match(Neighbors.class, msg -> this.nodes = msg.array)
                 .build();
     }
 }

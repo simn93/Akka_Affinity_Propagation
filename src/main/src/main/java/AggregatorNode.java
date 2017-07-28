@@ -1,7 +1,5 @@
 import akka.actor.AbstractActor;
 import akka.actor.ActorRef;
-import akka.actor.dsl.Creators;
-
 import java.util.HashMap;
 import java.util.HashSet;
 
@@ -21,7 +19,11 @@ public class AggregatorNode extends AbstractActor {
      * It only contains those received for which
      * the cluster has not yet been calculated
      */
-    private final HashMap<Long,Pair> values;
+    class Pair {
+        long counter;
+        final HashSet<Integer> indices;
+        Pair(){counter = 0; indices = new HashSet<>();}
+    } private final HashMap<Long,Pair> values;
 
     /**
      * Ref to master

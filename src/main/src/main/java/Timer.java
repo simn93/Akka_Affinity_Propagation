@@ -41,14 +41,14 @@ class Timer{
     /**
      * Start the stopwatch, setting startTime to the current milliseconds.
      * */
-    public void start(){
+    void start(){
         this.startTime = System.currentTimeMillis();
     }
 
     /**
      * End the stopwatch, setting endTime to the current milliseconds.
      * */
-    public void stop(){
+    void stop(){
         this.endTime = System.currentTimeMillis();
     }
 

@@ -1,8 +1,6 @@
 import akka.actor.AbstractActor;
 import akka.actor.ActorRef;
-import akka.event.Logging;
 import akka.event.LoggingAdapter;
-
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -35,7 +33,11 @@ public class AggregatorMaster extends AbstractActor{
      * Last set of calculated specimens.
      * We also remember the iteration to which it corresponds
      */
-    private Pair exemplar;
+    class Pair {
+        long counter;
+        final HashSet<Integer> indices;
+        Pair(){counter = 0; indices = new HashSet<>();}
+    }  private Pair exemplar;
 
     /**
      * Value of the last iteration in which the cluster has changed
@@ -48,24 +50,19 @@ public class AggregatorMaster extends AbstractActor{
     private final HashMap<Long,Pair> exemplars;
 
     /**
-     * Akka logger
-     * Logging in Akka is not tied to a specific logging backend.
-     * By default log messages are printed to STDOUT,
-     * but you can plug-in a SLF4J logger or your own logger.
-     * Logging is performed asynchronously
-     * to ensure that logging has minimal performance impact.
-     * Logging generally means IO and locks,
-     * which can slow down the operations of your code if it was performed synchronously.
+     *
      */
-    private final LoggingAdapter log = Logging.getLogger(getContext().getSystem(), this);
+    private final long enoughIterations;
 
     /**
-     * Reference list of nodes.
-     * It is used at termination of the algorithm.
-     * It is used to send all the nodes
-     * at the same time a termination message.
+     *
      */
-    private ActorRef[] nodes;
+    private final boolean verbose;
+
+    /**
+     *
+     */
+    private final LoggingAdapter log;
 
     /**
      * Create the class
@@ -74,8 +71,12 @@ public class AggregatorMaster extends AbstractActor{
      *
      * @param localAggregatorSize size of local aggregator
      */
-    public AggregatorMaster(int localAggregatorSize){
+    public AggregatorMaster(int localAggregatorSize, long enoughIterations, boolean verbose, LoggingAdapter log){
         this.localAggregatorSize = localAggregatorSize;
+        this.enoughIterations = enoughIterations;
+        this.verbose = verbose;
+        this.log = log;
+
         this.exemplar = new Pair();
         this.exemplars = new HashMap<>();
         this.aggregatorRef = new ArrayList<>();
@@ -94,7 +95,6 @@ public class AggregatorMaster extends AbstractActor{
      * that were already queued in the mailbox.
      *
      * @see Value
-     * @see Neighbors
      * @return receive handler
      */
     @Override
@@ -110,6 +110,7 @@ public class AggregatorMaster extends AbstractActor{
 
                     /* All local aggregator have send their set */
                     if(current.counter == localAggregatorSize){
+                        if(verbose) log.info("Waiting exemplars list: " + exemplars.size());
 
                         /* Semantics Change: Stores the iteration it refers to */
                         current.counter = localExemplar.iteration;
@@ -122,7 +123,7 @@ public class AggregatorMaster extends AbstractActor{
                          * and update the reference to the iteration counter.
                          */
                         if(! exemplar.indices.equals(current.indices)){
-                            //log.info(current.counter + " " + difference(exemplar.indices,current.indices).toString());
+                            if(verbose)log.info("It: " + current.counter + " Ex Size: " + exemplar.indices.size() + " Diff: " + difference(exemplar.indices,current.indices).toString());
                             exemplarIt = current.counter;
                         }
 
@@ -131,7 +132,7 @@ public class AggregatorMaster extends AbstractActor{
                         exemplars.remove(localExemplar.iteration);
 
                         /* End check */
-                        if(localExemplar.iteration - exemplarIt > Constant.enoughIterations){
+                        if(localExemplar.iteration - exemplarIt > enoughIterations){
                             timer.stop();
                             log.info("Job done U_U after " + exemplarIt + " iterations and " + timer);
 
@@ -140,9 +141,7 @@ public class AggregatorMaster extends AbstractActor{
                         }
                     }
                 })
-                .match(Hello.class, msg ->{
-                    aggregatorRef.add(sender());})
-                .match(Neighbors.class, msg -> this.nodes = msg.array)
+                .match(Hello.class, msg -> aggregatorRef.add(sender()))
                 .build();
     }
 
@@ -152,7 +151,7 @@ public class AggregatorMaster extends AbstractActor{
      * @param list2 second set
      * @return union of sets
      */
-    public HashSet<Integer> union(HashSet<Integer> list1, HashSet<Integer> list2) {
+    private HashSet<Integer> union(HashSet<Integer> list1, HashSet<Integer> list2) {
         HashSet<Integer> set = new HashSet<>();
 
         set.addAll(list1);
@@ -167,7 +166,7 @@ public class AggregatorMaster extends AbstractActor{
      * @param list2 second set
      * @return intersection of sets
      */
-    public HashSet<Integer> intersection(HashSet<Integer> list1, HashSet<Integer> list2) {
+    private HashSet<Integer> intersection(HashSet<Integer> list1, HashSet<Integer> list2) {
         HashSet<Integer> list = new HashSet<>();
 
         for (Integer t : list1) {
@@ -185,7 +184,7 @@ public class AggregatorMaster extends AbstractActor{
      * @param list2 second set
      * @return difference of sets
      */
-    public HashSet<Integer> difference(HashSet<Integer> list1, HashSet<Integer> list2){
+    private HashSet<Integer> difference(HashSet<Integer> list1, HashSet<Integer> list2){
         HashSet<Integer> listU = union(list1,list2);
         HashSet<Integer> listI = intersection(list1,list2);
         listU.removeAll(listI);

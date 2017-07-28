@@ -1,5 +1,4 @@
 import akka.actor.ActorRef;
-
 import java.util.HashMap;
 import java.util.HashSet;
 
@@ -15,10 +14,10 @@ interface Messages {
  * Responsibility
  */
 class Responsibility implements Messages {
-    public final double value;
-    public final int sender;
+    final double value;
+    final int sender;
 
-    public Responsibility (double value, int sender){
+    Responsibility (double value, int sender){
         this.value = value;
         this.sender = sender;
     }
@@ -28,43 +27,29 @@ class Responsibility implements Messages {
  * Availability
  */
 class Availability implements Messages {
-    public final double value;
-    public final int sender;
+    final double value;
+    final int sender;
 
-    public Availability (double value, int sender){
+    Availability(double value, int sender) {
         this.value = value;
         this.sender = sender;
     }
 }
 
 /**
- * Neighbors class
- * Provides information on links to cluster nodes
- */
-class Neighbors implements Messages {
-    public final ActorRef[] array;
-    @SuppressWarnings("unused")
-    public final int size;
-
-    public Neighbors(ActorRef[] array, int size){
-        this.array = array;
-        this.size = size;
-    }
-}
-/**
- *
+ * Node Settings
  */
 class NodeSetting implements Messages{
-    public final HashMap<Integer,Double> s_row;
-    public final int selfID;
-    public final int r_received_size;
-    public final int a_received_size;
-    public final ActorRef[] r_not_infinite_neighbors;
-    public final ActorRef[] a_not_infinite_neighbors;
-    public final int[] r_reference;
-    public final int[] a_reference;
-    public final HashMap<Integer,Double> a_row;
-    public final HashMap<Integer,Double> r_col;
+    final HashMap<Integer,Double> s_row;
+    final int selfID;
+    final int r_received_size;
+    final int a_received_size;
+    final ActorRef[] r_not_infinite_neighbors;
+    final ActorRef[] a_not_infinite_neighbors;
+    final int[] r_reference;
+    final int[] a_reference;
+    final HashMap<Integer,Double> a_row;
+    final HashMap<Integer,Double> r_col;
 
     NodeSetting(HashMap<Integer,Double> s_row, int selfID,
                 int r_received_size, int a_received_size,
@@ -90,11 +75,11 @@ class NodeSetting implements Messages{
  * Defines which iteration is related
  */
 class Value implements Messages {
-    public final Double value;
-    public final int sender;
-    public final long iteration;
+    final Double value;
+    final int sender;
+    final long iteration;
 
-    public Value(Double value, int sender, long iteration){
+    Value(Double value, int sender, long iteration){
         this.value = value;
         this.sender = sender;
         this.iteration = iteration;
@@ -118,20 +103,21 @@ class Ready implements Messages {
 }
 
 /**
- *
+ * Message from local aggregator to master
+ * @see AggregatorNode
  */
 class LocalExemplars implements Messages {
-    public final long iteration;
-    public final HashSet<Integer> exemplars;
+    final long iteration;
+    final HashSet<Integer> exemplars;
 
-    public LocalExemplars(long iteration, HashSet<Integer> exemplars){
+    LocalExemplars(long iteration, HashSet<Integer> exemplars){
         this.iteration = iteration;
         this.exemplars = exemplars;
     }
 }
 
 /**
- *
+ * Message for actor recognition
  */
 class Hello implements Messages {
 }
