@@ -1,9 +1,6 @@
+package affinityPropagation;
 import akka.actor.*;
-import akka.event.Logging;
-import akka.event.LoggingAdapter;
 import akka.remote.RemoteScope;
-
-import java.util.Date;
 import java.util.HashMap;
 
 /**
@@ -25,6 +22,7 @@ public class AffinityPropagation {
             int size,
             int subClusterSize,
             ActorSystem system,
+            ActorRef log,
             Address[] nodes_address,
             boolean verbose,
             double lambda,
@@ -32,18 +30,6 @@ public class AffinityPropagation {
             int sendEach,
             double sigma
     ){
-        /*
-         * Akka logger
-         * Logging in Akka is not tied to a specific logging backend.
-         * By default log messages are printed to STDOUT,
-         * but you can plug-in a SLF4J logger or your own logger.
-         * Logging is performed asynchronously
-         * to ensure that logging has minimal performance impact.
-         * Logging generally means IO and locks,
-         * which can slow down the operations of your code if it was performed synchronously.
-         */
-        LoggingAdapter log = Logging.getLogger(system, this);
-
         StringBuilder infoMsg = new StringBuilder();
         infoMsg.append("Program Launched with: \n");
         infoMsg.append("DataSet: ").append(lineMatrix).append("\n");
@@ -61,7 +47,7 @@ public class AffinityPropagation {
             infoMsg.append("\n");
         }
 
-        log.info(infoMsg.toString());
+        log.tell(infoMsg.toString(),ActorRef.noSender());
 
         /* Map for deploy */
         HashMap<Integer,Integer> clusterSize = new HashMap<>();
@@ -89,7 +75,7 @@ public class AffinityPropagation {
 
             ActorRef aggregator = system.actorOf(Props.create(AggregatorNode.class, clusterSize.get(i),aggregatorMaster).withDeploy(deploy));
             for(int j=0; j<clusterSize.get(i); j++){
-                nodes[t] = system.actorOf(Props.create(Node.class,aggregator,lambda,sendEach,verbose).withDeploy(deploy));
+                nodes[t] = system.actorOf(Props.create(Node.class,aggregator,lambda,sendEach,verbose,log).withDeploy(deploy));
                 t++;
             }
         }
@@ -99,7 +85,7 @@ public class AffinityPropagation {
         for(int i=0; i<clusterSize.size(); i++){
             Deploy deploy = new Deploy(new RemoteScope(nodes_address[i % nodes_address.length]));
             t+= clusterSize.get(i);
-            system.actorOf(Props.create(DispatcherNode.class,lineMatrix, colMatrix, lineFormat, sigma, t-clusterSize.get(i), t, nodes, dispatcherMaster).withDeploy(deploy));
+            system.actorOf(Props.create(DispatcherNode.class,lineMatrix, colMatrix, lineFormat, sigma, t-clusterSize.get(i), t, nodes, dispatcherMaster, log).withDeploy(deploy));
         }
     }
 }

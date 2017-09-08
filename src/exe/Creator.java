@@ -1,4 +1,8 @@
+package exe;
+
+import affinityPropagation.*;
 import akka.actor.*;
+import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
 import org.json.simple.*;
 import org.json.simple.parser.*;
@@ -34,6 +38,9 @@ public class Creator {
         loadSetting("./setting.json");
         verbose = false;
 
+        String IP = "127.0.0.1";
+        int port = 2552;
+
         for(int i = 0; i < args.length; i+=2) switch (args[i]) {
             case "-sett":
                 loadSetting(args[i + 1]);
@@ -68,14 +75,29 @@ public class Creator {
             case "-verbose":
                 verbose = Boolean.parseBoolean(args[i+1]);
                 break;
+            case "-ip":
+                IP = args[i+1];
+                break;
             default:
                 System.out.println(args[i] + " not recognized");
         }
 
+        String listenerConfig =
+                "akka.remote.netty.tcp {\n" +
+                        "  hostname = \"" + IP +"\"\n" +
+                        "  port = " + port + "\n" +
+                        "}";
+
+        Config config = ConfigFactory.parseString(listenerConfig)
+                .withFallback(ConfigFactory.load("common"));
+
+        ActorSystem system = ActorSystem.create("creatorSystem", config);
+
         new AffinityPropagation(
                 lineMatrix,colMatrix,
                 lineFormat,size,subClusterSize,
-                ActorSystem.create("creatorSystem", ConfigFactory.load("creator")),
+                system,
+                system.actorOf(Props.create(LogActor.class),"log"),
                 buildAddress(deployIP,remotePort),
                 verbose,lambda,enoughIterations,sendEach,sigma
         );

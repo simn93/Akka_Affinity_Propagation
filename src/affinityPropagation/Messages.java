@@ -1,3 +1,5 @@
+package affinityPropagation;
+
 import akka.actor.ActorRef;
 import java.util.HashMap;
 import java.util.HashSet;

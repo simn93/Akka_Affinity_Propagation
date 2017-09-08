@@ -1,3 +1,5 @@
+package affinityPropagation;
+
 import akka.actor.AbstractActor;
 import akka.actor.ActorRef;
 import akka.event.LoggingAdapter;
@@ -37,7 +39,7 @@ class Node extends AbstractActor{
     /**
      *
      */
-    private final LoggingAdapter log;
+    private final ActorRef log;
     //------------------
 
     // Received from Initialize
@@ -139,7 +141,7 @@ class Node extends AbstractActor{
      * Send a hello message to the dispatcher
      * @param aggregator link to aggregator
      */
-    public Node(ActorRef aggregator, double lambda, int sendEach, boolean verbose, LoggingAdapter log) {
+    public Node(ActorRef aggregator, double lambda, int sendEach, boolean verbose, ActorRef log) {
         this.aggregator = aggregator;
         this.lambda = lambda;
         this.sendEach = sendEach;
@@ -230,7 +232,7 @@ class Node extends AbstractActor{
             if (this.iteration % (sendEach) == (sendEach - 1))
                 aggregator.tell(new Value(r_col.get(self) + a_row.get(self), self, iteration), self());
 
-            if (verbose && self == 0) log.info("Iteration " + iteration + " completed!");
+            if (verbose && self == 0) log.tell("Iteration " + iteration + " completed!", ActorRef.noSender());
             sendResponsibility();
 
             this.iteration++;

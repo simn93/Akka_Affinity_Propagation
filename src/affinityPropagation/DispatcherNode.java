@@ -1,3 +1,5 @@
+package affinityPropagation;
+
 import akka.actor.AbstractActor;
 import akka.actor.ActorRef;
 import akka.event.LoggingAdapter;
@@ -47,7 +49,7 @@ class DispatcherNode extends AbstractActor {
     /**
      *
      */
-    private final LoggingAdapter log;
+    private final ActorRef log;
 
     /**
      * Initialized value at 0
@@ -88,7 +90,7 @@ class DispatcherNode extends AbstractActor {
      * @param colMatrix file with matrix memorized by column
      * @param nodes ref to all nodes
      */
-    private DispatcherNode(String lineMatrix, String colMatrix, String lineFormat, double sigma, int from, int to, ActorRef[] nodes, ActorRef master, LoggingAdapter log){
+    private DispatcherNode(String lineMatrix, String colMatrix, String lineFormat, double sigma, int from, int to, ActorRef[] nodes, ActorRef master, ActorRef log){
         this.from = from;
         this.localSize = to - from;
         this.master = master;
@@ -224,7 +226,7 @@ class DispatcherNode extends AbstractActor {
     @Override
     public void postStop(){
         timer.stop();
-        log.info(localSize + " Dispatched in " + timer);
+        log.tell(localSize + " Dispatched in " + timer, ActorRef.noSender());
     }
 
     private void stringByteToHashMap(byte[] v, HashMap<Integer,Double> map){

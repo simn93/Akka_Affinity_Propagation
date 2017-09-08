@@ -1,3 +1,5 @@
+package affinityPropagation;
+
 import akka.actor.AbstractActor;
 import akka.actor.ActorRef;
 import akka.event.LoggingAdapter;
@@ -62,7 +64,7 @@ public class AggregatorMaster extends AbstractActor{
     /**
      *
      */
-    private final LoggingAdapter log;
+    private final ActorRef log;
 
     /**
      * Create the class
@@ -71,7 +73,7 @@ public class AggregatorMaster extends AbstractActor{
      *
      * @param localAggregatorSize size of local aggregator
      */
-    public AggregatorMaster(int localAggregatorSize, long enoughIterations, boolean verbose, LoggingAdapter log){
+    public AggregatorMaster(int localAggregatorSize, long enoughIterations, boolean verbose, ActorRef log){
         this.localAggregatorSize = localAggregatorSize;
         this.enoughIterations = enoughIterations;
         this.verbose = verbose;
@@ -110,7 +112,7 @@ public class AggregatorMaster extends AbstractActor{
 
                     /* All local aggregator have send their set */
                     if(current.counter == localAggregatorSize){
-                        if(verbose) log.info("Waiting exemplars list: " + exemplars.size());
+                        if(verbose) log.tell("Waiting exemplars list: " + exemplars.size(),ActorRef.noSender());
 
                         /* Semantics Change: Stores the iteration it refers to */
                         current.counter = localExemplar.iteration;
@@ -123,7 +125,7 @@ public class AggregatorMaster extends AbstractActor{
                          * and update the reference to the iteration counter.
                          */
                         if(! exemplar.indices.equals(current.indices)){
-                            if(verbose)log.info("It: " + current.counter + " Ex Size: " + exemplar.indices.size() + " Diff: " + difference(exemplar.indices,current.indices).toString());
+                            if(verbose)log.tell("It: " + current.counter + " Ex Size: " + exemplar.indices.size() + " Diff: " + difference(exemplar.indices,current.indices).toString(),ActorRef.noSender());
                             exemplarIt = current.counter;
                         }
 
@@ -134,7 +136,7 @@ public class AggregatorMaster extends AbstractActor{
                         /* End check */
                         if(localExemplar.iteration - exemplarIt > enoughIterations){
                             timer.stop();
-                            log.info("Job done U_U after " + exemplarIt + " iterations and " + timer);
+                            log.tell("Job done U_U after " + exemplarIt + " iterations and " + timer, ActorRef.noSender());
 
                             for(ActorRef node : aggregatorRef) node.tell(new Ready(),ActorRef.noSender());
                             context().system().terminate();
