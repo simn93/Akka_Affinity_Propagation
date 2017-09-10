@@ -10,7 +10,7 @@ import java.util.HashSet;
  *
  * @author Simone Schirinzi
  */
-public class AggregatorNode extends AbstractActor {
+class AggregatorNode extends AbstractActor {
     /**
      * Number of node to aggregate
      */
@@ -47,7 +47,7 @@ public class AggregatorNode extends AbstractActor {
 
     /**
      * Receive value from localSize nodes.
-     * Check and memorize only which their message is > 0.
+     * Check and memorize only which their message is greater then 0.
      * Send partial exemplar set to master
      *
      * @see Value

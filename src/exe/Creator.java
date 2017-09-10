@@ -37,8 +37,10 @@ public class Creator {
         loadSetting("./setting.json");
         verbose = false;
 
-        String IP = "127.0.0.1";
-        int port = 2552;
+        String localIP = "127.0.0.1", bindIP = "127.0.0.1";
+        int localPort = 2552, bindPort = 2552;
+        String listenerConfig;
+        boolean nat = false;
 
         for(int i = 0; i < args.length; i+=2) switch (args[i]) {
             case "-sett":
@@ -75,17 +77,34 @@ public class Creator {
                 verbose = Boolean.parseBoolean(args[i+1]);
                 break;
             case "-ip":
-                IP = args[i+1];
+                localIP = args[i+1];
+                break;
+            case "-bind":
+                bindIP = args[i+1];
+                nat = true;
+                break;
+            case "-port":
+                localPort = bindPort = Integer.parseInt(args[i+1]);
                 break;
             default:
                 System.out.println(args[i] + " not recognized");
         }
 
-        String listenerConfig =
-                "akka.remote.netty.tcp {\n" +
-                        "  hostname = \"" + IP +"\"\n" +
-                        "  port = " + port + "\n" +
-                        "}";
+        if(nat){
+            listenerConfig =
+                    "akka.remote.netty.tcp {\n" +
+                            "  hostname = \"" + bindIP +"\"\n" +
+                            "  port = " + bindPort + "\n" +
+                            "  bind-hostname = " + localIP + "\n" +
+                            "  bind-port = " + localPort + "\n" +
+                            "}";
+        } else {
+            listenerConfig =
+                    "akka.remote.netty.tcp {\n" +
+                            "  hostname = \"" + localIP +"\"\n" +
+                            "  port = " + localPort + "\n" +
+                            "}";
+        }
 
         Config config = ConfigFactory.parseString(listenerConfig)
                 .withFallback(ConfigFactory.load("common"));

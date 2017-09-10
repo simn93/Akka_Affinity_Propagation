@@ -8,11 +8,11 @@ import java.util.ArrayList;
  * Class for actor start synchronization
  * @author Simone Schirinzi
  */
-public class DispatcherMaster extends AbstractActor {
+class DispatcherMaster extends AbstractActor {
     /**
-     *
+     * Refs to local dispatcher
      */
-    private ArrayList<ActorRef> dispatcher;
+    private final ArrayList<ActorRef> dispatcher;
 
     /**
      * Size of active local dispatcher

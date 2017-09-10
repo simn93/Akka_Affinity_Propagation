@@ -2,7 +2,6 @@ package affinityPropagation;
 
 import akka.actor.AbstractActor;
 import akka.actor.ActorRef;
-import akka.event.LoggingAdapter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -15,7 +14,7 @@ import java.util.HashSet;
  * @author Simone Schirinzi
  */
 
-public class AggregatorMaster extends AbstractActor{
+class AggregatorMaster extends AbstractActor{
     /**
      * Timer for counting time used
      */
@@ -52,17 +51,17 @@ public class AggregatorMaster extends AbstractActor{
     private final HashMap<Long,Pair> exemplars;
 
     /**
-     *
+     * Limits of stable results for research stop
      */
     private final long enoughIterations;
 
     /**
-     *
+     * Flag for detailed log
      */
     private final boolean verbose;
 
     /**
-     *
+     * Ref for log
      */
     private final ActorRef log;
 
@@ -72,6 +71,9 @@ public class AggregatorMaster extends AbstractActor{
      * Start the timer
      *
      * @param localAggregatorSize size of local aggregator
+     * @param enoughIterations how many stable output before stop
+     * @param verbose flag for detailed log
+     * @param log Ref to log
      */
     public AggregatorMaster(int localAggregatorSize, long enoughIterations, boolean verbose, ActorRef log){
         this.localAggregatorSize = localAggregatorSize;

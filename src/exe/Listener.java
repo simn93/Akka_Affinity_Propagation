@@ -4,6 +4,11 @@ import akka.actor.ActorSystem;
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
 
+/**
+ * Daemon starter
+ *
+ * @author Simone Schirinzi
+ */
 public class Listener {
     public static void main(String[] args){
         String localIP = "127.0.0.1", bindIP = "127.0.0.1";
@@ -14,19 +19,19 @@ public class Listener {
         if(args != null){
             for(int i = 0; i < args.length; i++){
                 switch (args[i]){
-                    case "-local" :
+                    case "-ip" :
                         localIP = args[i+1];
                         localPort = Integer.parseInt(args[i+2]);
                         i+=2;
                         break;
-                    case "-bindWith" :
+                    case "-bind" :
                         nat = true;
                         bindIP = args[i+1];
                         bindPort = Integer.parseInt(args[i+2]);
                         i+=2;
                         break;
                     default:
-                        System.out.println("''" + args[i] + "'' non è riconosciuto come comando.");
+                        System.out.println("''" + args[i] + "'' non recognized command.");
                         break;
                 }
             }

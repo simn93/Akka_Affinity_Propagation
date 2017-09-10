@@ -2,8 +2,6 @@ package affinityPropagation;
 
 import akka.actor.AbstractActor;
 import akka.actor.ActorRef;
-import akka.event.LoggingAdapter;
-
 import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -18,9 +16,10 @@ import java.util.zip.ZipFile;
  */
 class DispatcherNode extends AbstractActor {
     /**
-     *
+     * Index of first node to initialize
      */
     private final int from;
+
     /**
      * Number of node to Start
      */
@@ -37,17 +36,17 @@ class DispatcherNode extends AbstractActor {
     private final ActorRef master;
 
     /**
-     *
+     * Refs to all nodes
      */
     private final ActorRef[] nodes;
 
     /**
-     *
+     * Sigma random factor
      */
     private final double sigma;
 
     /**
-     *
+     * Ref to log
      */
     private final ActorRef log;
 
@@ -88,7 +87,13 @@ class DispatcherNode extends AbstractActor {
      *
      * @param lineMatrix file with matrix memorized by lines
      * @param colMatrix file with matrix memorized by column
+     * @param lineFormat codec for line in zip input
+     * @param sigma constant as dumping message update
+     * @param from index of first node to initialize
+     * @param to index of last node to initializa
      * @param nodes ref to all nodes
+     * @param master ref to dispatcher master
+     * @param log ref to log
      */
     private DispatcherNode(String lineMatrix, String colMatrix, String lineFormat, double sigma, int from, int to, ActorRef[] nodes, ActorRef master, ActorRef log){
         this.from = from;
@@ -163,6 +168,14 @@ class DispatcherNode extends AbstractActor {
         }
     }
 
+    /**
+     * Create and initialize data structure for nodes
+     *
+     * @param i Index of node to initialize
+     * @param s_row Similarity non infinite row for node
+     * @param s_col Similarity non infinite col for node
+     * @param nodes Refs to all nodes
+     */
     private void sendNodeSetting(int i, HashMap<Integer,Double> s_row, HashMap<Integer,Double> s_col, ActorRef[] nodes){
         HashMap<Integer, Double> a_row = new HashMap<>();
         HashMap<Integer, Double> r_col = new HashMap<>();
@@ -207,8 +220,7 @@ class DispatcherNode extends AbstractActor {
      * @see Ready
      * @return receive handler
      */
-    @Override
-    public Receive createReceive() {
+    @Override public Receive createReceive() {
         return receiveBuilder()
                 .match(Ready.class, msg -> {
                     this.ready++;
@@ -223,12 +235,20 @@ class DispatcherNode extends AbstractActor {
                 .build();
     }
 
-    @Override
-    public void postStop(){
+    /**
+     * After initialize all nodes, this actor die and print statistics
+     */
+    @Override public void postStop(){
         timer.stop();
         log.tell(localSize + " Dispatched in " + timer, ActorRef.noSender());
     }
 
+    /**
+     * Convert byte vector to HashMap of similarity
+     *
+     * @param v byte vector of String
+     * @param map returned HashMap
+     */
     private void stringByteToHashMap(byte[] v, HashMap<Integer,Double> map){
         ByteBuffer buffer = ByteBuffer.allocate(v.length);
         buffer.put(v);
@@ -241,6 +261,12 @@ class DispatcherNode extends AbstractActor {
         for(int i=0; i<split.length;i++)if((value = Double.parseDouble(split[i]))!=0)map.put(i,value + getNoise());
     }
 
+    /**
+     * Convert byte vector to HashMap of similarity
+     *
+     * @param v byte vector of String in like-hash format
+     * @param map returned hashMap
+     */
     private void hashStringByteToHashMap(byte[] v, HashMap<Integer,Double> map){
         ByteBuffer buffer = ByteBuffer.allocate(v.length);
         buffer.put(v);
@@ -260,6 +286,12 @@ class DispatcherNode extends AbstractActor {
         }
     }
 
+    /**
+     * Convert byte vector to HashMap of similarity
+     *
+     * @param v byte vector of Double
+     * @param map returned hashMap
+     */
     private void doubleByteToHashMap(byte[] v, HashMap<Integer,Double> map){
         ByteBuffer buffer = ByteBuffer.allocate(v.length);
         buffer.put(v);
@@ -276,6 +308,12 @@ class DispatcherNode extends AbstractActor {
         }
     }
 
+    /**
+     * Convert byte vector to HashMap of similarity
+     *
+     * @param v byte vector of Integer and Double pair in like-hash format
+     * @param map returned hashMap
+     */
     private void hashBytesToHashMap(byte[] v, HashMap<Integer,Double> map) {
         ByteBuffer buffer = ByteBuffer.allocate(v.length);
         buffer.put(v);
@@ -291,6 +329,11 @@ class DispatcherNode extends AbstractActor {
         assert (v.length == map.size() * (Integer.BYTES + Double.BYTES));
     }
 
+    /**
+     * Obtain random noise for similarity
+     *
+     * @return random noise
+     */
     private double getNoise(){
         double random = Math.random();
         random -= 0.5;

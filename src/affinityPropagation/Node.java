@@ -2,8 +2,6 @@ package affinityPropagation;
 
 import akka.actor.AbstractActor;
 import akka.actor.ActorRef;
-import akka.event.LoggingAdapter;
-
 import java.util.HashMap;
 
 /**
@@ -22,24 +20,25 @@ class Node extends AbstractActor{
     private final ActorRef aggregator;
 
     /**
-     *
+     * lambda factor for dumping messages update
      */
     private final double lambda;
 
     /**
-     *
+     * Set how many iterations wait for send message to aggregator
      */
     private final int sendEach;
 
     /**
-     *
+     * Flag for detailed log
      */
     private final boolean verbose;
 
     /**
-     *
+     * Ref to log
      */
     private final ActorRef log;
+
     //------------------
 
     // Received from Initialize
@@ -140,6 +139,10 @@ class Node extends AbstractActor{
      * Initializes iteration variables
      * Send a hello message to the dispatcher
      * @param aggregator link to aggregator
+     * @param lambda dumping factor
+     * @param sendEach tic for aggregator message
+     * @param verbose flag for detailed log
+     * @param log Ref to log
      */
     public Node(ActorRef aggregator, double lambda, int sendEach, boolean verbose, ActorRef log) {
         this.aggregator = aggregator;
@@ -306,6 +309,13 @@ class Node extends AbstractActor{
             a_not_infinite_neighbors[i].tell(new Availability(a(i,sum), self), self());
     }
 
+    /**
+     * Support function for "a" function computation
+     *
+     * @param i node index
+     * @param sum global sum for this node
+     * @return a(i,j)
+     */
     private double a(int i, double sum){
         double r_col_i = r_col.get(a_reference[i]);
         double sumLess = r_col_i > 0.0 ? sum - r_col_i : sum;

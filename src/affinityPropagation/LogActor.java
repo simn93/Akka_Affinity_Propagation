@@ -1,17 +1,31 @@
 package affinityPropagation;
+
 import akka.actor.AbstractActor;
 import akka.event.Logging;
 import akka.event.LoggingAdapter;
 
+/**
+ * Actor for logging
+ *
+ * Simple print all String received
+ * @author Simone Schirinzi
+ */
 public class LogActor extends AbstractActor {
-    private LoggingAdapter log;
+    /**
+     * Akka log
+     */
+    private final LoggingAdapter log;
 
     public LogActor(){
         log = Logging.getLogger(getContext().getSystem(), this);
     }
 
-    @Override
-    public Receive createReceive() {
-        return receiveBuilder().match(String.class, s -> log.info(s)).build();
+    /**
+     * Receive String and log them
+     *
+     * @return Handle for messages
+     */
+    @Override public Receive createReceive() {
+        return receiveBuilder().match(String.class, log::info).build();
     }
 }
