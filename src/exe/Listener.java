@@ -6,15 +6,49 @@ import com.typesafe.config.ConfigFactory;
 
 public class Listener {
     public static void main(String[] args){
-        String IP = "127.0.0.1";
-        int port = 2553;
-        if(args.length > 0)IP = args[0];
+        String localIP = "127.0.0.1", bindIP = "127.0.0.1";
+        int localPort = 2553, bindPort = 2553;
+        String listenerConfig;
+        boolean nat = false;
 
-        String listenerConfig =
-        "akka.remote.netty.tcp {\n" +
-        "  hostname = \"" + IP +"\"\n" +
-        "  port = " + port + "\n" +
-        "}";
+        if(args != null){
+            for(int i = 0; i < args.length; i++){
+                switch (args[i]){
+                    case "-local" :
+                        localIP = args[i+1];
+                        localPort = Integer.parseInt(args[i+2]);
+                        i+=2;
+                        break;
+                    case "-bindWith" :
+                        nat = true;
+                        bindIP = args[i+1];
+                        bindPort = Integer.parseInt(args[i+2]);
+                        i+=2;
+                        break;
+                    default:
+                        System.out.println("''" + args[i] + "'' non è riconosciuto come comando.");
+                        break;
+                }
+            }
+        }
+
+        if(nat){
+            listenerConfig =
+                    "akka.remote.netty.tcp {\n" +
+                            "  hostname = \"" + bindIP +"\"\n" +
+                            "  port = " + bindPort + "\n" +
+                            "  bind-hostname = " + localIP + "\n" +
+                            "  bind-port = " + localPort + "\n" +
+                            "}";
+        } else {
+            listenerConfig =
+                    "akka.remote.netty.tcp {\n" +
+                            "  hostname = \"" + localIP +"\"\n" +
+                            "  port = " + localPort + "\n" +
+                            "}";
+        }
+
+
 
         Config config = ConfigFactory.parseString(listenerConfig)
                 .withFallback(ConfigFactory.load("common.conf"));

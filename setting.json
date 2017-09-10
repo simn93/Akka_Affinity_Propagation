@@ -1,0 +1,16 @@
+{
+  "deploy" : [
+    {"ip" : "192.168.1.5", "port" : 2553},
+    {"ip" : "192.168.1.5", "port" : 2554}
+  ],
+  "lineMatrix" : "./exonsLineHashByte.zip",
+  "colMatrix" : "./exonsLineHashByteT.zip",
+  "lineFormat" : "hashDouble",
+  "size" : 10001,
+  "subClusterSize" : 1000,
+  "lambda" : 0.8,
+  "enoughIterations" : 25,
+  "sendEach" : 1,
+  "sigma" : 0.0,
+  "verbose" : false
+}

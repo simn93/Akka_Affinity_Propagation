@@ -17,8 +17,7 @@ import java.io.IOException;
  * @author Simone Schirinzi
  */
 public class Creator {
-    private static String[] deployIP;
-    private static int remotePort;
+    private static Address[] remoteAddress;
     private static String lineMatrix;
     private static String colMatrix;
     private static String lineFormat;
@@ -98,16 +97,9 @@ public class Creator {
                 lineFormat,size,subClusterSize,
                 system,
                 system.actorOf(Props.create(LogActor.class),"log"),
-                buildAddress(deployIP,remotePort),
+                remoteAddress,
                 verbose,lambda,enoughIterations,sendEach,sigma
         );
-    }
-
-    private static Address[] buildAddress(String[] IP, int port){
-        Address[] address = new Address[IP.length];
-        for(int i = 0; i < IP.length; i++)
-            address[i] = new Address("akka.tcp", "lookupSystem", IP[i], port);
-        return address;
     }
 
     private static void loadSetting(String sett_path){
@@ -116,15 +108,19 @@ public class Creator {
             JSONParser parser = new JSONParser();
             jsonObject = (JSONObject) parser.parse(r);
 
-            JSONArray array = (JSONArray) jsonObject.get("deployIP");
-            deployIP = new String[array.size()];
+            JSONArray array = (JSONArray) jsonObject.get("deploy");
+            remoteAddress = new Address[array.size()];
 
-            int i = 0;
-            for(Object o: array) {
-                deployIP[i] = (String) o; i++;
+            int i = 0; for(Object o: array) {
+                remoteAddress[i] = new Address(
+                                "akka.tcp",
+                                "lookupSystem",
+                                ((String) ((JSONObject) o).get("ip")),
+                                ((Long) ((JSONObject) o).get("port")).intValue()
+                        );
+                i++;
             }
 
-            remotePort = ((Long) jsonObject.get("remotePort")).intValue();
             lineMatrix = ((String) jsonObject.get("lineMatrix"));
             colMatrix = ((String) jsonObject.get("colMatrix"));
             lineFormat = ((String) jsonObject.get("lineFormat"));
