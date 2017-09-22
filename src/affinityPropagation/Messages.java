@@ -18,10 +18,12 @@ interface Messages {
 class Responsibility implements Messages {
     final double value;
     final int sender;
+    final int selfID;
 
-    Responsibility (double value, int sender){
+    Responsibility (double value, int sender, int selfID){
         this.value = value;
         this.sender = sender;
+        this.selfID = selfID;
     }
 }
 
@@ -31,10 +33,12 @@ class Responsibility implements Messages {
 class Availability implements Messages {
     final double value;
     final int sender;
+    final int selfID;
 
-    Availability(double value, int sender) {
+    Availability(double value, int sender, int selfID) {
         this.value = value;
         this.sender = sender;
+        this.selfID = selfID;
     }
 }
 

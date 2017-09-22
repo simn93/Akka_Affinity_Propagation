@@ -9,37 +9,8 @@ import java.util.HashMap;
  *
  * @author Simone Schirinzi
  */
-class Node extends AbstractActor{
-    // Connection variable
-
-    /**
-     * Link to the actor responsible for generating the cluster.
-     * Received when creating the node.
-     * Each node periodically sends a Value () message to check the algorithm's performance.
-     */
-    private final ActorRef aggregator;
-
-    /**
-     * lambda factor for dumping messages update
-     */
-    private final double lambda;
-
-    /**
-     * Set how many iterations wait for send message to aggregator
-     */
-    private final int sendEach;
-
-    /**
-     * Flag for detailed log
-     */
-    private final boolean verbose;
-
-    /**
-     * Ref to log
-     */
-    private final ActorRef log;
-
-    //------------------
+class Node{
+    private final NodeActor actor;
 
     // Received from Initialize
     //Similarity
@@ -138,42 +109,17 @@ class Node extends AbstractActor{
      * Create a node
      * Initializes iteration variables
      * Send a hello message to the dispatcher
-     * @param aggregator link to aggregator
-     * @param lambda dumping factor
-     * @param sendEach tic for aggregator message
-     * @param verbose flag for detailed log
-     * @param log Ref to log
+     * @param actor ref to Actor
      */
-    public Node(ActorRef aggregator, double lambda, int sendEach, boolean verbose, ActorRef log) {
-        this.aggregator = aggregator;
-        this.lambda = lambda;
-        this.sendEach = sendEach;
-        this.verbose = verbose;
-        this.log = log;
-    }
-
-    /**
-     * Receive builder
-     * @return Node message manager
-     * @see NodeSetting
-     * @see Start
-     * @see Responsibility
-     * @see Availability
-     */
-    @Override public Receive createReceive() {
-        return receiveBuilder()
-                .match(NodeSetting.class, this::initializeHandler)
-                .match(Start.class, msg -> sendResponsibility())
-                .match(Responsibility.class, this::responsibilityHandler)
-                .match(Availability.class, this::availabilityHandler)
-                .build();
+    public Node(NodeActor actor) {
+        this.actor = actor;
     }
 
     /**
      * Handler for the initialization message
      * @param init received message
      */
-    private void initializeHandler(NodeSetting init){
+    public void initializeHandler(NodeSetting init){
         this.s_row = init.s_row;
         this.self = init.selfID;
         this.r_received_size = init.r_received_size;
@@ -184,7 +130,6 @@ class Node extends AbstractActor{
         this.a_reference = init.a_reference;
         this.a_row = init.a_row;
         this.r_col = init.r_col;
-        sender().tell(new Ready(), self());
     }
 
     /**
@@ -197,8 +142,8 @@ class Node extends AbstractActor{
      * @param responsibility received
      * @see Responsibility
      */
-    private void responsibilityHandler(Responsibility responsibility){
-        r_col.put(responsibility.sender, (r_col.get(responsibility.sender) * lambda) + (responsibility.value * (1 - lambda)));
+    public void responsibilityHandler(Responsibility responsibility){
+        r_col.put(responsibility.sender, (r_col.get(responsibility.sender) * actor.lambda) + (responsibility.value * (1 - actor.lambda)));
         r_received++;
 
         if (r_received == r_received_size) {
@@ -224,18 +169,18 @@ class Node extends AbstractActor{
      * @param availability received
      * @see Availability
      */
-    private void availabilityHandler(Availability availability){
-        a_row.put(availability.sender, (a_row.get(availability.sender) * lambda) + (availability.value * (1 - lambda)));
+    public void availabilityHandler(Availability availability){
+        a_row.put(availability.sender, (a_row.get(availability.sender) * actor.lambda) + (availability.value * (1 - actor.lambda)));
         a_received++;
 
         if (a_received == a_received_size) {
             a_received = 0;
 
             /* End of an iteration. Check whether or not to send an update. */
-            if (this.iteration % (sendEach) == (sendEach - 1))
-                aggregator.tell(new Value(r_col.get(self) + a_row.get(self), self, iteration), self());
+            if (this.iteration % (actor.sendEach) == (actor.sendEach - 1))
+                actor.tell(actor.aggregator, new Value(r_col.get(self) + a_row.get(self), self, iteration));
 
-            if (verbose && self == 0) log.tell("Iteration " + iteration + " completed!", ActorRef.noSender());
+            if (actor.verbose && self == 0) actor.log.tell("Iteration " + iteration + " completed!", ActorRef.noSender());
             sendResponsibility();
 
             this.iteration++;
@@ -264,7 +209,7 @@ class Node extends AbstractActor{
      *
      * @see Responsibility
      */
-    private void sendResponsibility(){
+    public void sendResponsibility(){
         double firstMax, secondMax;
         int firstK = -1;
         firstMax = secondMax = Double.NEGATIVE_INFINITY;
@@ -279,7 +224,7 @@ class Node extends AbstractActor{
         }
 
         for (int i = 0; i < r_not_infinite_neighbors.length; i++)
-            r_not_infinite_neighbors[i].tell(new Responsibility((r_reference[i] == firstK ? s_row.get(r_reference[i]) - secondMax : s_row.get(r_reference[i]) - firstMax), self), self());
+            actor.tell(r_not_infinite_neighbors[i], new Responsibility((r_reference[i] == firstK ? s_row.get(r_reference[i]) - secondMax : s_row.get(r_reference[i]) - firstMax), self, r_reference[i]));
     }
 
     /**
@@ -299,14 +244,14 @@ class Node extends AbstractActor{
      * by subtracting r_col[j] from that sum
      * only if r_col[j] is positive.
      */
-    private void sendAvailability(){
+    public void sendAvailability(){
         double sum = r_col.get(self);
         for(int q : a_reference)
             if(q != self && r_col.get(q) > 0.0)
                 sum += r_col.get(q);
 
         for (int i = 0; i < a_not_infinite_neighbors.length; i++)
-            a_not_infinite_neighbors[i].tell(new Availability(a(i,sum), self), self());
+            actor.tell(a_not_infinite_neighbors[i],new Availability(a(i,sum), self,a_reference[i]));
     }
 
     /**

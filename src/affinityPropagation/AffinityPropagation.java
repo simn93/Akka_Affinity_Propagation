@@ -21,6 +21,7 @@ public class AffinityPropagation {
             String lineFormat,
             int size,
             int subClusterSize,
+            int actorSize,
             ActorSystem system,
             ActorRef log,
             Address[] nodes_address,
@@ -74,9 +75,11 @@ public class AffinityPropagation {
             Deploy deploy = new Deploy(new RemoteScope(nodes_address[i % nodes_address.length]));
 
             ActorRef aggregator = system.actorOf(Props.create(AggregatorNode.class, clusterSize.get(i),aggregatorMaster).withDeploy(deploy));
-            for(int j=0; j<clusterSize.get(i); j++){
-                nodes[t] = system.actorOf(Props.create(Node.class,aggregator,lambda,sendEach,verbose,log).withDeploy(deploy));
-                t++;
+            for(int j=0; j<clusterSize.get(i);){
+                ActorRef node = system.actorOf(Props.create(NodeActor.class,aggregator,lambda,sendEach,verbose,log).withDeploy(deploy));
+                for(int k=0; k<actorSize && t<size; k++, j++, t++){
+                    nodes[t]=node;
+                }
             }
         }
 

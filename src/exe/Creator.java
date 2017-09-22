@@ -23,6 +23,7 @@ public class Creator {
     private static String lineFormat;
     private static int size;
     private static int subClusterSize;
+    private static int actorSize;
     private static double lambda;
     private static long enoughIterations;
     private static int sendEach;
@@ -60,6 +61,9 @@ public class Creator {
                 break;
             case "-cluster":
                 subClusterSize = Integer.parseInt(args[i + 1]);
+                break;
+            case "-actorSize":
+                actorSize = Integer.parseInt(args[i + 1]);
                 break;
             case "-lambda":
                 lambda = Double.parseDouble(args[i + 1]);
@@ -113,7 +117,7 @@ public class Creator {
 
         new AffinityPropagation(
                 lineMatrix,colMatrix,
-                lineFormat,size,subClusterSize,
+                lineFormat,size,subClusterSize,actorSize,
                 system,
                 system.actorOf(Props.create(LogActor.class),"log"),
                 remoteAddress,
@@ -145,6 +149,7 @@ public class Creator {
             lineFormat = ((String) jsonObject.get("lineFormat"));
             size = ((Long) jsonObject.get("size")).intValue();
             subClusterSize = ((Long) jsonObject.get("subClusterSize")).intValue();
+            actorSize = ((Long) jsonObject.get("actorSize")).intValue();
             lambda = ((Double) jsonObject.get("lambda"));
             enoughIterations = ((Long) jsonObject.get("enoughIterations"));
             sendEach = ((Long) jsonObject.get("sendEach")).intValue();
